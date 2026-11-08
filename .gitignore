@@ -1,0 +1,7 @@
+# Never commit secrets
+.dev.vars
+proxy/.dev.vars
+.env
+*.key
+.wrangler/
+node_modules/

@@ -1,0 +1,53 @@
+# Evaluation harness.
+# • Every push: a no-key self-test (--mock) proving the known-good answers pass every check.
+# • Actions tab → "Evaluation" → Run workflow: the real eval against Gemini (needs repo secret GEMINI_API_KEY).
+#   The report appears on the run's summary page and as a downloadable artifact.
+name: Evaluation
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      trials:
+        description: 'Trials per case (n)'
+        default: '3'
+      k:
+        description: 'k for pass^k'
+        default: '3'
+      stub_web:
+        description: 'Use fixed map/wiki data (only the model varies)'
+        type: boolean
+        default: false
+
+jobs:
+  self-test:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node eval/run_eval.mjs --mock --out eval/results-mock --min-pass1 1
+
+  real-eval:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run eval against Gemini
+        run: node eval/run_eval.mjs --trials ${{ inputs.trials }} --k ${{ inputs.k }} ${{ inputs.stub_web && '--stub-web' || '' }}
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      - name: Publish report to the run summary
+        if: always()
+        run: cat eval/results/report.md >> "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-results
+          path: eval/results

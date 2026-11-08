@@ -1,0 +1,27 @@
+# Deploys the Cloudflare Worker proxy when proxy/ changes (or when run by hand).
+# Repo secrets needed (Settings → Secrets and variables → Actions):
+#   CLOUDFLARE_API_TOKEN  – Cloudflare token with "Edit Cloudflare Workers" permission
+#   CLOUDFLARE_ACCOUNT_ID – from the Cloudflare dashboard
+#   GEMINI_API_KEY        – your Gemini key (stored by Cloudflare as an encrypted Worker secret)
+name: Deploy proxy (Cloudflare Worker)
+
+on:
+  push:
+    branches: [main]
+    paths: ['proxy/**']
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: proxy
+          secrets: |
+            GEMINI_API_KEY
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

@@ -1,0 +1,11 @@
+{
+  "name": "global-foodie",
+  "private": true,
+  "type": "module",
+  "description": "Agentic food guide for travelers. Static site (GitHub Pages) + Cloudflare Worker proxy for Gemini.",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "eval": "node eval/run_eval.mjs",
+    "eval:mock": "node eval/run_eval.mjs --mock --out eval/results-mock"
+  }
+}

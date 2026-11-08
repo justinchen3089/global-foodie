@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Global Foodie</title>
+  <meta name="description" content="Agentic AI that helps travelers decide what to order abroad, based on location, taste and dietary needs.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
+  <!-- LEAFLET:START -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- LEAFLET:END -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">🌍</span>
+      <div><b>Global Foodie</b><small>Your agentic food guide abroad</small></div>
+    </div>
+    <div class="top-actions">
+      <button id="toggleSide" class="ghost only-mobile" aria-label="Show agent panel">🧠</button>
+      <button id="openScenarios" class="ghost">🧳<span class="label"> Scenarios</span></button>
+      <button id="newChat" class="ghost">New chat</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="chat">
+      <div id="mapCard" class="map-card" hidden>
+        <div class="map-head">
+          <span id="mapPlace"></span>
+          <span id="mapCount" class="muted small"></span>
+          <div class="map-tabs" role="tablist">
+            <button type="button" data-view="google">Google Maps</button>
+            <button type="button" data-view="pins">Pins</button>
+          </div>
+          <button type="button" id="mapChange" class="ghost small">Change</button>
+          <button type="button" id="mapToggle" class="ghost small" aria-label="Hide map">▴</button>
+        </div>
+        <div id="mapBody">
+          <div id="gmap" class="map gmap"></div>
+          <div id="map" class="map" hidden></div>
+          <div id="placeList" class="place-list" hidden></div>
+        </div>
+      </div>
+
+      <div id="messages" class="messages" aria-live="polite">
+        <div class="welcome" id="welcome">
+          <h1>Not sure what to order?</h1>
+          <p>Tell me where you are and what you like. I'll research local dishes, check them against anything you can't eat and find places nearby. You can also snap a photo of a menu.</p>
+
+          <ol class="onboarding">
+            <li class="ob-step" id="obLocation">
+              <div class="ob-title"><span class="ob-num">1</span>Where are you?</div>
+              <div class="ob-body">
+                <button type="button" id="obGeo" class="primary">📍 Use my location</button>
+                <span class="muted">or</span>
+                <form id="obPlace" class="ob-place">
+                  <input name="q" placeholder="City, neighborhood or hotel" aria-label="Type your location">
+                  <button>Go</button>
+                </form>
+              </div>
+              <p class="ob-status small" id="obLocStatus"></p>
+            </li>
+
+            <li class="ob-step locked" id="obDiet">
+              <div class="ob-title"><span class="ob-num">2</span>Anything you can't eat? <span class="muted small">(optional)</span></div>
+              <div id="obDietGroups"></div>
+              <form id="obOther" class="ob-other">
+                <label for="obOtherInput" class="small"><b>Not listed?</b> Type any allergy or food you avoid</label>
+                <div class="ob-other-row">
+                  <input id="obOtherInput" name="v" placeholder="e.g. kiwi, cilantro, mango, garlic, MSG" autocomplete="off">
+                  <select name="cat" aria-label="Type"><option value="allergy">Allergy</option><option value="diet">Avoid / diet</option></select>
+                  <button>Add</button>
+                </div>
+              </form>
+              <div class="ob-body">
+                <button type="button" id="obDietDone" class="primary">Continue</button>
+                <button type="button" id="obNone">No restrictions</button>
+                <button type="button" id="obSkip" class="ghost">Skip</button>
+              </div>
+            </li>
+
+            <li class="ob-step locked" id="obCraving">
+              <div class="ob-title"><span class="ob-num">3</span>What are you in the mood for?</div>
+              <div class="starters">
+                <button data-prompt="What are the must-try local dishes around here, and where can I get them?">🍽️ Must-try local dishes nearby</button>
+                <button data-prompt="I want something spicy for dinner nearby. What should I order?">🌶️ Something spicy</button>
+                <button data-prompt="I'm hungry and on a budget. What's a cheap, filling local meal nearby (under $15)?">💵 Cheap eats under $15</button>
+                <button data-prompt="I'm going to attach a menu photo. Translate or explain it and tell me what fits my preferences.">📷 Help me read a menu</button>
+              </div>
+              <p class="muted small">…or type anything below.</p>
+            </li>
+          </ol>
+
+          <section class="scenarios">
+            <h2>Or try a sample scenario</h2>
+            <p class="muted small">Each one loads a sample traveler (location and allergies) and asks the agent for help. It replaces your current allergy list.</p>
+            <div class="scenario-grid" id="scenarioGrid"></div>
+          </section>
+        </div>
+      </div>
+
+      <form id="composer" class="composer" autocomplete="off">
+        <div id="attachments" class="attachments"></div>
+        <div class="composer-row">
+          <label class="icon-btn" title="Attach a menu or dish photo">
+            📷<input type="file" id="fileInput" accept="image/*" multiple hidden>
+          </label>
+          <textarea id="input" rows="1" placeholder="e.g. Something spicy with noodles, not too expensive"></textarea>
+          <button id="sendBtn" type="submit" class="primary">Send</button>
+        </div>
+        <p class="composer-note">Class demo · messages are sent to Google Gemini, so don't share sensitive personal info · always confirm allergens with restaurant staff · <a href="https://github.com/YOUR-USERNAME/global-foodie/blob/main/GOVERNANCE.md" target="_blank" rel="noopener">How your data is handled</a></p>
+      </form>
+    </section>
+
+    <aside class="side" id="side">
+      <nav class="tabs" role="tablist">
+        <button role="tab" data-tab="trace" class="active">Agent trace</button>
+        <button role="tab" data-tab="memory">Memory</button>
+      </nav>
+      <div id="trace" class="panel active">
+        <p class="muted">Each step the agent takes — tool calls, inputs and results — appears here.</p>
+      </div>
+      <div id="memory" class="panel"></div>
+    </aside>
+  </main>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

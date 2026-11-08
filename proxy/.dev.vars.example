@@ -1,0 +1,5 @@
+# Local testing only (used by `npx wrangler dev`).
+# 1. Copy this file to a new file named .dev.vars  (same folder)
+# 2. Paste your Gemini key after the = sign
+# .dev.vars is listed in .gitignore, so it will never be pushed to GitHub.
+GEMINI_API_KEY=paste-your-gemini-api-key-here
