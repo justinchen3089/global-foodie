@@ -254,8 +254,12 @@ $('#toggleSide').addEventListener('click', () => $('#side').classList.toggle('op
 if (CONFIG.PREVIEW) {
   const b = document.createElement('div');
   b.className = 'preview-banner';
-  b.innerHTML = '<b>Preview mode</b> · replays sample conversations. Allergy checks, taste matching and memory run for real; location, restaurants and search use sample data.';
+  b.innerHTML = '<b>Demo mode</b> · allergy checks, taste matching and memory run for real; location, restaurants and search use sample data. <button type="button" id="resetDemo" class="ghost small">↺ Reset demo</button>';
   document.querySelector('.chat').prepend(b);
+  b.querySelector('#resetDemo').addEventListener('click', () => {
+    try { localStorage.removeItem('globalfoodie.memory.v1'); } catch { /* storage unavailable */ }
+    location.reload();
+  });
 }
 
 // ---------- Map updates from agent tools ----------
