@@ -90,7 +90,6 @@ input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey)
 
 $('#composer').addEventListener('submit', (e) => { e.preventDefault(); send(input.value.trim()); });
 document.querySelectorAll('[data-prompt]').forEach((b) => b.addEventListener('click', () => {
-  if (b.dataset.prompt.includes('attach a menu')) { $('#fileInput').click(); input.value = 'Here is a menu — translate it and tell me what fits my preferences.'; return; }
   send(b.dataset.prompt);
 }));
 
@@ -465,8 +464,18 @@ $('#cravingForm').addEventListener('submit', (e) => {
   send(msg);
 });
 
-// ---------- "Your agent team" strip ----------
-$('#agentTeam').innerHTML = '<div class="team-title">Your agent team</div><div class="team-row">'
-  + `<div class="team-card orch"><span>🤖</span><b>Orchestrator</b><small>Plans and answers</small></div>`
-  + Object.values(AGENTS).map((a) => `<div class="team-card"><span>${a.emoji}</span><b>${escapeHtml(a.name)}</b><small>${escapeHtml(a.goal)}</small></div>`).join('')
-  + '</div>';
+// ---------- Upload my food / a menu ----------
+const UPLOAD_PROMPTS = {
+  dish: "Here's a photo of my food. What is this dish, what's in it, and is it okay for me to eat?",
+  menu: "Here's a photo of a menu. Read it and tell me what I should order, based on what I'm craving and what I can't eat.",
+};
+let uploadKind = 'dish';
+document.querySelectorAll('[data-upload]').forEach((b) => b.addEventListener('click', () => { uploadKind = b.dataset.upload; $('#foodInput').click(); }));
+$('#foodInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try { pendingImages = [await fileToImage(file)]; } catch { alert(`Couldn't read ${file.name}`); return; }
+  renderAttachments();
+  send(UPLOAD_PROMPTS[uploadKind]);
+});

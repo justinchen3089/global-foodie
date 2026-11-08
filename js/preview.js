@@ -329,6 +329,13 @@ async function playSteps(steps, hooks) {
 export async function runPreview({ userText, images = [], scenarioId, hooks = {} }) {
   await wait(400);
   if (!images.length && !scenarioId && /^Craving for:/i.test(userText || '')) return runCravingPreview(userText, hooks);
+  if (images.length) {
+    const msg = `📷 Got your photo. **Reading photos needs the live agent**, because it uses Gemini's vision model, so this demo can't look at it.
+
+On your website, the **Image agent** identifies the dish or reads every menu item, the **Allergy agent** checks each one against your allergies, and the orchestrator tells you what to order.`;
+    hooks.onText?.(msg, true);
+    return msg;
+  }
   const script = images.length ? null
     : SCRIPTS[scenarioId] || Object.values(SCRIPTS).find((s) => s.match.test(userText || ''));
   if (!script) { hooks.onText?.(FALLBACK, true); return FALLBACK; }

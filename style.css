@@ -147,6 +147,14 @@ button.ghost { background: transparent; }
 .small-starters { margin-top: .8rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
 .small-starters button { padding: .55rem .75rem; font-size: .88rem; }
 
+.upload-food { margin-top: .9rem; }
+.upload-title { font-size: .85rem; color: var(--muted); margin-bottom: .4rem; }
+.upload-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: .5rem; }
+.upload-btn { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: .6rem; align-items: center; text-align: left; padding: .75rem .9rem; border: 2px dashed #e7b48f; background: #fff7f0; border-radius: var(--radius); }
+.upload-btn:hover { border-color: var(--accent); background: var(--accent-soft); }
+.upload-btn span { grid-row: span 2; font-size: 1.6rem; }
+.upload-btn small { color: var(--muted); font-size: .8rem; }
+
 /* Multi-agent trace */
 .step.delegation { border-color: #c7b8a8; background: #fff; }
 .step.nested { margin-left: 1.1rem; width: calc(100% - 1.1rem); border-left: 3px solid var(--saffron); }

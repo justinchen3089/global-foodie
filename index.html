@@ -50,8 +50,6 @@
           <h1>Not sure what to order?</h1>
           <p>Tell me where you are and what you like. I'll research local dishes, check them against anything you can't eat and find places nearby. You can also snap a photo of a menu.</p>
 
-          <div class="team" id="agentTeam" aria-label="Your agent team"></div>
-
           <ol class="onboarding">
             <li class="ob-step" id="obLocation">
               <div class="ob-title"><span class="ob-num">1</span>Where are you?</div>
@@ -94,8 +92,15 @@
                   <button class="primary" id="cravingGo">Find my food</button>
                 </div>
               </form>
+              <div class="upload-food">
+                <div class="upload-title">…or upload a photo</div>
+                <div class="upload-row">
+                  <button type="button" class="upload-btn" data-upload="dish"><span>📷</span><b>Upload my food</b><small>Photo of a dish: what is it, and can I eat it?</small></button>
+                  <button type="button" class="upload-btn" data-upload="menu"><span>📜</span><b>Upload a menu</b><small>Photo of a menu: what should I order?</small></button>
+                </div>
+                <input type="file" id="foodInput" accept="image/*" hidden>
+              </div>
               <div class="starters small-starters">
-                <button data-prompt="I'm going to attach a menu photo. Read it and tell me what fits my preferences.">📷 Read a menu photo</button>
                 <button data-prompt="What are the must-try local dishes around here, and where can I get them?">🍽️ Must-try local dishes</button>
                 <button data-prompt="What did I order before, and what would I like this time based on my past choices?">🧠 Based on my past choices</button>
               </div>
@@ -113,7 +118,7 @@
       <form id="composer" class="composer" autocomplete="off">
         <div id="attachments" class="attachments"></div>
         <div class="composer-row">
-          <label class="icon-btn" title="Attach a menu or dish photo">
+          <label class="icon-btn" title="Upload a photo of your food or a menu">
             📷<input type="file" id="fileInput" accept="image/*" multiple hidden>
           </label>
           <textarea id="input" rows="1" placeholder="Craving for… (e.g. spicy noodles), or ask anything"></textarea>
