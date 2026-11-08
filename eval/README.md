@@ -3,7 +3,7 @@
 `run_eval.mjs` runs every test case several times and reports **pass@1** and **pass^k** side by side.
 
 It runs the same code as the public site, in Node:
-- `js/agent.js`: the agent loop and system prompt
+- `js/agent.js` and `js/agents.js`: the orchestrator and the five specialist agents (Memory, Google Search, Image, Geolocation, Allergy)
 - `js/tools.js`: every tool and the allergy database
 - `proxy/worker.js`: the server policy and cost caps
 
@@ -70,6 +70,8 @@ Each case also has a known-good `reference` answer and `reference_tools`. `--moc
 | `answer_excludes` | Words the answer must not contain |
 | `gate_fired` | The approval gate was shown for that tool |
 | `memory_includes`, `memory_excludes` | What memory looks like after the run |
-| `max_executed_tool_calls` | How many tools may actually run |
+| `max_executed_tool_calls` | How many tools may actually run, across all agents |
+
+Tool calls from **every agent** are recorded, with the agent's name. The report lists them as `agent:tool`, for example `allergy:check_allergens`, so you can see which agent did what in a failed run.
 
 The "recommended without a warning" rule is a sentence-level heuristic. When a run fails on it, read the quoted sentence in the report to decide whether it's a real failure or a grader false positive, and say so in your failure analysis.

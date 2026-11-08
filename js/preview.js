@@ -3,6 +3,7 @@
 // location, restaurant search and web search return clearly marked SAMPLE data.
 import { TOOL_MAP } from './tools.js';
 import { GATED_TOOLS } from './agent.js';
+import { AGENTS, TOOL_OWNER } from './agents.js';
 import { loadMemory, setLastLocation } from './memory.js';
 import { formatDistance, walkMinutes } from './units.js';
 
@@ -240,30 +241,99 @@ Because cilantro isn't a common allergy, staff may think you just dislike it. Sa
   },
 };
 
-const FALLBACK = `**Preview mode.** This preview replays eight sample scenarios. Pick one under **"Or try a sample scenario,"** or type a message that mentions one (for example *shellfish*, *celiac*, *cilantro* or *alpha-gal*).
+const FALLBACK = `**Preview mode.** This preview can answer **"Craving for…"** requests from the built-in database, and it replays eight sample scenarios (🧳 button). You can also type a message that mentions one (for example *shellfish*, *celiac*, *cilantro* or *alpha-gal*).
 
 Once you deploy the site with your Gemini proxy, the agent answers anything, including menu photos.`;
 
-export async function runPreview({ userText, images = [], scenarioId, hooks = {} }) {
-  const script = images.length ? null
-    : SCRIPTS[scenarioId] || Object.values(SCRIPTS).find((s) => s.match.test(userText || ''));
-  await wait(500);
-  if (!script) { hooks.onText?.(FALLBACK, true); return FALLBACK; }
-  let i = 0;
-  for (const step of script.steps) {
-    const call = { id: `preview_${Date.now()}_${i}`, name: step.tool, input: step.input };
+// Turn a "Craving for: …" message into a real recommendation from the built-in database (no Gemini needed).
+const CRAVING_MAP = [
+  [/noodle|ramen|pho|udon/i, { dish_type: 'noodles', flavors: ['savory'] }], [/spicy|hot|heat/i, { flavors: ['spicy', 'chili-paste'] }],
+  [/seafood|fish|shrimp|lobster|crab/i, { dish_type: 'seafood', flavors: ['fresh'] }], [/bbq|barbecue|brisket/i, { dish_type: 'BBQ', flavors: ['smoky'] }],
+  [/taco|mexican|burrito/i, { dish_type: 'tacos', flavors: ['tangy'] }], [/pizza/i, { dish_type: 'pizza', flavors: ['savory'] }],
+  [/soup|stew/i, { dish_type: 'soup', flavors: ['savory', 'aromatic'] }], [/sushi|japanese/i, { cuisine: 'Japanese', flavors: ['fresh'] }],
+  [/curry/i, { dish_type: 'curry', flavors: ['aromatic', 'creamy'] }], [/burger|sandwich/i, { dish_type: 'sandwich', flavors: ['rich', 'savory'] }],
+  [/light|healthy|fresh|salad/i, { flavors: ['fresh', 'herby', 'citrusy'] }], [/sweet|dessert/i, { flavors: ['sweet'] }],
+  [/comfort|cozy|hearty/i, { flavors: ['rich', 'creamy', 'savory'] }], [/cheap|budget/i, { flavors: ['savory'] }],
+  [/local|specialty/i, { flavors: ['savory', 'aromatic'] }],
+];
+
+async function runCravingPreview(text, hooks) {
+  const want = { flavors: new Set(), dish_type: null, cuisine: null };
+  for (const [re, v] of CRAVING_MAP) if (re.test(text)) {
+    (v.flavors || []).forEach((f) => want.flavors.add(f));
+    want.dish_type ||= v.dish_type || null; want.cuisine ||= v.cuisine || null;
+  }
+  if (!want.flavors.size) want.flavors.add('savory');
+  const steps = [
+    { tool: 'get_memory', input: {} },
+    { tool: 'recommend_by_taste', input: { liked_flavors: [...want.flavors], ...(want.dish_type ? { dish_type: want.dish_type } : {}), ...(want.cuisine ? { cuisine_or_country: want.cuisine } : {}), limit: 4 } },
+  ];
+  const outputs = await playSteps(steps, hooks);
+  const recs = (outputs[1]?.recommendations || []).slice(0, 3);
+  const mem = loadMemory();
+  const hasRestrictions = mem.allergies.length || mem.diet.length;
+  const checks = hasRestrictions ? await playSteps(recs.map((r) => check(r.name)), hooks) : [];
+  const cuisines = [...new Set(recs.map((r) => r.cuisine.split(/[ (/]/)[0].toLowerCase()))];
+  const placeNames = recs.map((r, i) => [`Sample ${r.cuisine.split(/[(/]/)[0].trim()} spot ${i + 1}`, r.cuisine.toLowerCase()]);
+  const places = await playSteps([{ tool: 'find_nearby_restaurants', input: { cuisine: cuisines.join(';') }, sample: () => sampleRestaurants(placeNames) }], hooks);
+  const pins = places[0]?.restaurants || [];
+  const icon = (v) => ({ avoid: '⛔ avoid', ask_staff_first: '⚠️ ask staff', no_known_conflict: '✅ no known conflict' }[v] || '');
+  const craving = text.replace(/^Craving for:\s*/i, '').replace(/\.\s*What should I order.*$/i, '');
+  let md = recs.length ? `Here's what fits your craving for **${craving}** (preview: picked from the built-in dish database):\n\n` : `I couldn't match **${craving}** in the preview database. The live agent searches Google for anything.\n`;
+  recs.forEach((r, i) => {
+    const v = checks[i]?.verdict;
+    const pin = pins.find((p) => p.name.endsWith(`spot ${i + 1}`));
+    md += `${i + 1}. **${r.name}**${r.local_name ? ` (${r.local_name})` : ''}: ${r.description} 🌶️ ${r.spice_level_0_to_5}/5${v ? ` · ${icon(v)}` : ''}${pin ? ` · ${pin.name} (sample), ${pin.distance_text}` : ''}\n`;
+  });
+  if (!hasRestrictions && recs.length) md += `\nTell me if you have any allergies and I'll double-check these.`;
+  hooks.onText?.(md, true);
+  return md;
+}
+
+/** Play scripted steps, showing each base tool under the specialist agent that owns it. */
+async function playSteps(steps, hooks) {
+  const outputs = [];
+  let i = 0, group = null;
+  const openGroup = (owner, firstStep) => {
+    if (owner === 'orchestrator') return null;
+    const a = AGENTS[owner];
+    const del = { id: `preview_del_${Date.now()}_${i}`, name: a.tool, input: { task: `(preview) ${firstStep.tool.replace(/_/g, ' ')}${firstStep.input?.dish_name ? `: ${firstStep.input.dish_name}…` : ''}` }, agent: 'orchestrator' };
+    hooks.onToolStart?.(del, ++i);
+    return { owner, del, count: 0 };
+  };
+  const closeGroup = () => {
+    if (group) hooks.onToolEnd?.(group.del, JSON.stringify({ agent: AGENTS[group.owner].name, report: `(preview) ran ${group.count} tool call(s)` }), false);
+    group = null;
+  };
+  for (const step of steps) {
+    const owner = TOOL_OWNER[step.tool] || 'orchestrator';
+    if (!group || group.owner !== owner) { closeGroup(); group = openGroup(owner, step); }
+    const call = { id: `preview_${Date.now()}_${i}`, name: step.tool, input: step.input, agent: owner, parentId: group?.del.id };
     hooks.onToolStart?.(call, ++i);
-    await wait(380);
-    let content, isError = false;
+    if (group) group.count++;
+    await wait(300);
     if (GATED_TOOLS[step.tool]) {
       const ok = hooks.confirm ? await hooks.confirm(call, GATED_TOOLS[step.tool]) : false;
-      if (!ok) { hooks.onToolEnd?.(call, JSON.stringify({ denied: true, message: 'The traveler declined this action.' }), false); continue; }
+      if (!ok) { const d = { denied: true, message: 'The traveler declined this action.' }; hooks.onToolEnd?.(call, JSON.stringify(d), false); outputs.push(d); continue; }
     }
-    try { content = JSON.stringify(step.sample ? (typeof step.sample === 'function' ? step.sample() : step.sample) : await TOOL_MAP[step.tool].run(step.input, {})); }
-    catch (e) { content = JSON.stringify({ error: e.message }); isError = true; }
-    hooks.onToolEnd?.(call, content, isError);
+    let out, isError = false;
+    try { out = step.sample ? (typeof step.sample === 'function' ? step.sample() : step.sample) : await TOOL_MAP[step.tool].run(step.input, {}); }
+    catch (e) { out = { error: e.message }; isError = true; }
+    hooks.onToolEnd?.(call, JSON.stringify(out), isError);
+    outputs.push(out);
   }
-  await wait(350);
+  closeGroup();
+  return outputs;
+}
+
+export async function runPreview({ userText, images = [], scenarioId, hooks = {} }) {
+  await wait(400);
+  if (!images.length && !scenarioId && /^Craving for:/i.test(userText || '')) return runCravingPreview(userText, hooks);
+  const script = images.length ? null
+    : SCRIPTS[scenarioId] || Object.values(SCRIPTS).find((s) => s.match.test(userText || ''));
+  if (!script) { hooks.onText?.(FALLBACK, true); return FALLBACK; }
+  await playSteps(script.steps, hooks);
+  await wait(300);
   hooks.onText?.(script.answer, true);
   return script.answer;
 }

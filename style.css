@@ -140,6 +140,27 @@ button.ghost { background: transparent; }
 .ob-other-row input { flex: 1; min-width: 160px; border: 1px solid var(--line); border-radius: 10px; padding: .5rem .7rem; background: #fff; }
 .ob-other-row select { border: 1px solid var(--line); border-radius: 10px; padding: .45rem .5rem; background: #fff; }
 
+.craving { margin-top: .7rem; }
+.craving-label { display: block; font-weight: 700; font-size: 1.05rem; margin-bottom: .45rem; color: var(--accent); }
+.craving .ob-other-row { margin-top: .6rem; }
+.small-starters { margin-top: .8rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.small-starters button { padding: .55rem .75rem; font-size: .88rem; }
+
+/* Multi-agent trace */
+.step.delegation { border-color: #c7b8a8; background: #fff; }
+.step.nested { margin-left: 1.1rem; width: calc(100% - 1.1rem); border-left: 3px solid var(--saffron); }
+.step summary { flex-wrap: wrap; row-gap: .2rem; }
+.agent-badge { font-size: .7rem; font-weight: 700; padding: .1rem .4rem; border-radius: 6px; background: #fef3c7; color: #92400e; white-space: nowrap; }
+.agent-badge.orch { background: #ede9fe; color: #5b21b6; }
+
+.team { margin: 1.1rem 0 0; text-align: left; }
+.team-title { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: .4rem; text-align: center; }
+.team-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .45rem; }
+.team-card { display: flex; flex-direction: column; gap: .1rem; padding: .55rem .65rem; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; font-size: .85rem; }
+.team-card span { font-size: 1.1rem; }
+.team-card small { color: var(--muted); line-height: 1.3; }
+.team-card.orch { background: #f5f3ff; border-color: #ddd6fe; }
+
 /* Scenarios */
 .scenarios { margin: 2rem 0 1rem; text-align: left; }
 .scenarios h2 { font-size: 1.1rem; margin: 0 0 .2rem; }

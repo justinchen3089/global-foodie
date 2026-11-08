@@ -337,4 +337,9 @@ export const TOOL_LABELS = {
   log_choice: '📝 Logging your choice',
   get_memory: '🧠 Reading memory',
   scenario: '🧳 Loading sample traveler',
+  ask_memory_agent: '🧠 Memory agent',
+  ask_search_agent: '🔎 Google Search agent',
+  ask_image_agent: '📷 Image agent',
+  ask_location_agent: '📍 Geolocation agent',
+  ask_allergy_agent: '🛡️ Allergy agent',
 };

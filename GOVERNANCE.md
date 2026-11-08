@@ -6,7 +6,7 @@
 
 | Data | Where it goes | Kept? |
 |---|---|---|
-| Chat messages and menu photos | Visitor's browser → my Cloudflare Worker → Google Gemini API | Chat lives only in the open browser tab and is gone on refresh. My Worker writes no logs or database. Google processes requests under the Gemini API terms; on the free tier Google may use them to improve its products, so the app tells users not to type sensitive information. |
+| Chat messages and menu photos | Visitor's browser → my Cloudflare Worker → Google Gemini API (photos go only to the Image agent's request) | Chat lives only in the open browser tab and is gone on refresh. My Worker writes no logs or database. Google processes requests under the Gemini API terms; on the free tier Google may use them to improve its products, so the app tells users not to type sensitive information. |
 | Traveler memory: allergies, diets, likes, spice level, notes, order history, last location | Visitor's own browser (`localStorage`) | Yes, on that device only. It is never sent to my server for storage. It is sent to Gemini inside the prompt so the agent can use it. The visitor can view, edit or clear it in the **Memory** tab. |
 | Device location (GPS) | Browser → OpenStreetMap Nominatim (to name the area) → memory | Only after the browser's permission prompt **and** an in-app Approve click, or when the visitor taps "Use my location." |
 | Public data the tools read | OpenStreetMap (Overpass, Nominatim), Wikipedia, Google Search (through Gemini grounding), and the built-in dish and allergy database | Not stored. |
@@ -15,7 +15,7 @@
 ## Where the human gate sits
 
 - **Actions:** `remember`, `forget` and `log_choice` (they write to persistent memory) and `get_current_location` (it reads private GPS data).
-- **Between which steps:** after Gemini returns a function call and **before** the tool runs (`runAgent` in `js/agent.js` waits on `confirm()`).
+- **Between which steps:** after an agent's Gemini call returns a function call and **before** the tool runs (`runLoop` in `js/agent.js` waits on `confirm()`). Only the Memory agent can call the memory tools, and only the Geolocation agent can call GPS, so every write goes through this one gate.
 - **What the screen shows:** a yellow card in the chat: "🔒 Approval needed: Save this to your traveler memory." It shows the exact function name and its JSON arguments, for example `remember({"category": "allergy", "value": "sesame"})`, with **Approve** and **Deny** buttons. On Deny the tool does not run, and the model is told the traveler declined.
 
 Search, lookup and allergy-check tools run without a gate, because they only read public data.
@@ -32,7 +32,7 @@ Search, lookup and allergy-check tools run without a gate, because they only rea
 - See anyone else's data. Memory is per-browser, and the server stores nothing.
 - Get the API key or the hidden instructions. A server-side policy is prepended to every request and can't be removed by the caller.
 - Send email, make payments or bookings, or delete anything. No such tools exist.
-- Exceed the cost caps: 8 tool calls per message, 20 messages per chat, 2,048 output tokens per answer, 30 requests per minute per IP, and 8 MB per request. Google AI Studio also has a spending cap.
+- Exceed the cost caps. Per message: 18 model calls and 24 tool calls across all six agents, 8 orchestrator calls, and a step limit per agent. Per chat: 20 messages. Per answer: 2,048 output tokens. Per IP: 60 requests per minute. Per request: 8 MB. Google AI Studio also has a spending cap.
 - Use my proxy from another website (origin allowlist).
 
 **Known residual risks:**

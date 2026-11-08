@@ -1,6 +1,6 @@
 # Global Foodie evaluation results
 
-- Date: 2026-11-08T19:22:48.959Z
+- Date: 2026-11-08T20:39:15.840Z
 - Mode: **MOCK self-test** (flaky=0); not a real model evaluation, stubbed OpenStreetMap/Wikipedia
 - 16 cases × 3 trials = 48 runs. pass@1 = c/n per case; pass^3 = C(c,3)/C(n,3) per case (chance that 3 runs in a row all pass). Both are averaged over cases.
 

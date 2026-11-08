@@ -8,11 +8,11 @@ ALLOWED_ORIGINS = "https://YOUR-USERNAME.github.io,http://localhost:8000"
 # "gemini-flash-latest" always points at Google's current Flash model. Pin a specific model if you prefer.
 GEMINI_MODEL = "gemini-flash-latest"
 
-# Per-visitor rate limit (30 requests / minute per IP) so nobody can drain your quota.
+# Per-visitor rate limit (60 model requests / minute per IP; one message uses ~5–15) so nobody can drain your quota.
 [[ratelimits]]
 name = "LIMITER"
 namespace_id = "1001"
-simple = { limit = 30, period = 60 }
+simple = { limit = 60, period = 60 }
 
 # The API key is NOT stored here. Set it as a secret:
 #   npx wrangler secret put GEMINI_API_KEY

@@ -47,7 +47,8 @@ const realFetch = globalThis.fetch.bind(globalThis);
 const PROXY = 'https://worker.eval';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const jsonRes = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json' } });
-let current = null; // { case, gates: [], ... }
+let current = null; // { case, modelCalls }
+let AGENTS, TOOL_OWNER; // loaded below with the app modules
 
 const { default: worker } = await import(pathToFileURL(join(ROOT, 'proxy/worker.js')).href);
 const workerEnv = {
@@ -68,17 +69,34 @@ async function geminiWithRetry(input, init) {
   }
 }
 
+// Mock model: replays each case's reference tool calls through the real multi-agent loop.
+// The orchestrator delegates to the agents that own those tools; each agent then calls its own tools.
 function mockGemini(payload) {
   if (payload.tools?.[0]?.google_search) return jsonRes({ candidates: [{ content: { parts: [{ text: 'Mock search result.' }] } }] });
   const c = current.case, contents = payload.contents, last = contents[contents.length - 1];
-  const userTurn = last.role === 'user' && last.parts.some((p) => typeof p.text === 'string');
+  const sys = (payload.systemInstruction?.parts || []).map((p) => p.text).join('\n');
+  const role = (sys.match(/\[AGENT:(\w+)\]/) || [])[1] || 'orchestrator';
+  const firstStep = last.role === 'user' && last.parts.some((p) => typeof p.text === 'string');
   const forbidTools = payload.toolConfig?.functionCallingConfig?.mode === 'NONE';
-  let parts;
-  if (userTurn && !forbidTools && c.reference_tools.length) {
-    parts = c.reference_tools.map((t, i) => ({ functionCall: { id: `mock${i}`, name: t.name, args: t.args } }));
-  } else {
-    const bad = Math.random() < FLAKY;
-    parts = [{ text: bad ? 'MOCK FAILURE: Sure, the Pad Thai and seafood gumbo are both safe for you.' : c.reference }];
+  const call = (name, args, i) => ({ functionCall: { id: `mock_${role}_${i}`, name, args } });
+  let parts = [];
+  if (firstStep && !forbidTools) {
+    if (role === 'orchestrator') {
+      const owners = [...new Set(c.reference_tools.map((t) => TOOL_OWNER[t.name] || 'orchestrator'))].filter((o) => o !== 'orchestrator');
+      if (c.image && !owners.includes('image')) owners.unshift('image');
+      parts = [
+        ...owners.map((o, i) => call(AGENTS[o].tool, { task: `${c.message} (mock delegation)` }, i)),
+        ...c.reference_tools.filter((t) => (TOOL_OWNER[t.name] || 'orchestrator') === 'orchestrator').map((t, i) => call(t.name, t.args, 100 + i)),
+      ];
+    } else {
+      parts = c.reference_tools.filter((t) => TOOL_OWNER[t.name] === role).map((t, i) => call(t.name, t.args, i));
+    }
+  }
+  if (!parts.length) {
+    const bad = role === 'orchestrator' && Math.random() < FLAKY;
+    const text = role !== 'orchestrator' ? `Mock ${role} agent report.`
+      : bad ? 'MOCK FAILURE: Sure, the Pad Thai and seafood gumbo are both safe for you.' : c.reference;
+    parts = [{ text }];
   }
   return jsonRes({ candidates: [{ content: { role: 'model', parts }, finishReason: 'STOP' }] });
 }
@@ -114,6 +132,7 @@ globalThis.fetch = async (input, init = {}) => {
 
 // ---------------- Load the app's real modules ----------------
 const { runAgent } = await import(pathToFileURL(join(ROOT, 'js/agent.js')).href);
+({ AGENTS, TOOL_OWNER } = await import(pathToFileURL(join(ROOT, 'js/agents.js')).href));
 const mem = await import(pathToFileURL(join(ROOT, 'js/memory.js')).href);
 const DATA = JSON.parse(readFileSync(join(ROOT, 'eval/cases.json'), 'utf8'));
 
@@ -205,7 +224,7 @@ for (const c of cases) {
           onText: (t) => run.texts.push(t),
           onToolEnd: (call, content) => {
             let output; try { output = JSON.parse(content); } catch { output = content; }
-            run.tools.push({ name: call.name, input: call.input, output, error: output?.error || null, denied: !!output?.denied });
+            run.tools.push({ name: call.name, agent: call.agent || 'orchestrator', input: call.input, output, error: output?.error || null, denied: !!output?.denied });
           },
           confirm: async (call) => { run.gates.push({ name: call.name, input: call.input }); return !c.deny_gates; },
           onCapped: (n) => { run.capped += n; },
@@ -247,7 +266,7 @@ if (!failed.length) md += 'None.\n';
 for (const r of failed) {
   md += `### ${r.case} · trial ${r.trial}\n\n`;
   md += `**Failed checks:**\n${r.failures.map((f) => `- ${f}`).join('\n')}\n\n`;
-  md += `**Tools called:** ${r.tools.map((t) => `${t.name}${t.output?.verdict ? `→${t.output.verdict}` : ''}${t.denied ? '(denied)' : ''}${t.error ? '(error)' : ''}`).join(', ') || 'none'}${r.capped ? ` · ${r.capped} call(s) dropped by cap` : ''}\n\n`;
+  md += `**Tools called (agent:tool):** ${r.tools.map((t) => `${t.agent}:${t.name}${t.output?.verdict ? `→${t.output.verdict}` : ''}${t.denied ? '(denied)' : ''}${t.error ? '(error)' : ''}`).join(', ') || 'none'}${r.capped ? ` · ${r.capped} call(s) dropped by cap` : ''}\n\n`;
   md += `**Answer:**\n\n> ${String(r.answer || '(empty)').slice(0, 900).replace(/\n/g, '\n> ')}\n\n`;
   md += `**Why it failed (write after reading the answer):** _TODO_\n\n`;
 }

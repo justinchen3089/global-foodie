@@ -12,7 +12,13 @@ export const CONFIG = {
   UNITS: 'imperial',
 
   // Cost caps enforced in the browser (the proxy enforces its own caps too).
-  LIMITS: { MAX_TOOL_CALLS_PER_TURN: 8, MAX_MODEL_CALLS_PER_TURN: 6, MAX_TURNS_PER_SESSION: 20 },
+  LIMITS: {
+    MAX_TOOL_CALLS_PER_TURN: 8,   // orchestrator calls per message (agent delegations + its own tools)
+    MAX_MODEL_CALLS_PER_TURN: 6,  // orchestrator model calls per message
+    MAX_TOTAL_MODEL_CALLS: 18,    // all six agents together, per message
+    MAX_TOTAL_TOOL_CALLS: 24,     // all six agents together, per message
+    MAX_TURNS_PER_SESSION: 20,    // messages per chat
+  },
 
   // true = replay sample scenarios with no Gemini calls (for demos before the proxy is set up).
   PREVIEW: false,

@@ -50,6 +50,8 @@
           <h1>Not sure what to order?</h1>
           <p>Tell me where you are and what you like. I'll research local dishes, check them against anything you can't eat and find places nearby. You can also snap a photo of a menu.</p>
 
+          <div class="team" id="agentTeam" aria-label="Your agent team"></div>
+
           <ol class="onboarding">
             <li class="ob-step" id="obLocation">
               <div class="ob-title"><span class="ob-num">1</span>Where are you?</div>
@@ -84,13 +86,19 @@
 
             <li class="ob-step locked" id="obCraving">
               <div class="ob-title"><span class="ob-num">3</span>What are you in the mood for?</div>
-              <div class="starters">
-                <button data-prompt="What are the must-try local dishes around here, and where can I get them?">🍽️ Must-try local dishes nearby</button>
-                <button data-prompt="I want something spicy for dinner nearby. What should I order?">🌶️ Something spicy</button>
-                <button data-prompt="I'm hungry and on a budget. What's a cheap, filling local meal nearby (under $15)?">💵 Cheap eats under $15</button>
-                <button data-prompt="I'm going to attach a menu photo. Translate or explain it and tell me what fits my preferences.">📷 Help me read a menu</button>
+              <form id="cravingForm" class="craving">
+                <label for="cravingInput" class="craving-label">Craving for…</label>
+                <div class="chips" id="cravingChips"></div>
+                <div class="ob-other-row">
+                  <input id="cravingInput" name="craving" placeholder="Craving for… e.g. spicy noodles, a big burger, something with avocado" autocomplete="off">
+                  <button class="primary" id="cravingGo">Find my food</button>
+                </div>
+              </form>
+              <div class="starters small-starters">
+                <button data-prompt="I'm going to attach a menu photo. Read it and tell me what fits my preferences.">📷 Read a menu photo</button>
+                <button data-prompt="What are the must-try local dishes around here, and where can I get them?">🍽️ Must-try local dishes</button>
+                <button data-prompt="What did I order before, and what would I like this time based on my past choices?">🧠 Based on my past choices</button>
               </div>
-              <p class="muted small">…or type anything below.</p>
             </li>
           </ol>
 
@@ -108,7 +116,7 @@
           <label class="icon-btn" title="Attach a menu or dish photo">
             📷<input type="file" id="fileInput" accept="image/*" multiple hidden>
           </label>
-          <textarea id="input" rows="1" placeholder="e.g. Something spicy with noodles, not too expensive"></textarea>
+          <textarea id="input" rows="1" placeholder="Craving for… (e.g. spicy noodles), or ask anything"></textarea>
           <button id="sendBtn" type="submit" class="primary">Send</button>
         </div>
         <p class="composer-note">Class demo · messages are sent to Google Gemini, so don't share sensitive personal info · always confirm allergens with restaurant staff · <a href="https://github.com/YOUR-USERNAME/global-foodie/blob/main/GOVERNANCE.md" target="_blank" rel="noopener">How your data is handled</a></p>

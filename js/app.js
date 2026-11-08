@@ -5,6 +5,7 @@ import { renderMarkdown } from './markdown.js';
 import { CONFIG } from './config.js';
 import { runPreview, previewLocate, sampleRestaurants, setScenarioLocation } from './preview.js';
 import { SCENARIOS } from './scenarios.js';
+import { AGENTS, AGENT_BY_TOOL } from './agents.js';
 import { showLocation, showRestaurants, refreshMap } from './map.js';
 
 const $ = (s) => document.querySelector(s);
@@ -20,10 +21,11 @@ let pendingImages = [];
 let busy = false;
 let turn = 0;
 let sessionTurns = 0;
+let session = {}; // per-chat state shared with the agents (e.g. attached photos)
 const messagesEl = $('#messages');
 
 function resetChat() {
-  history = []; turn = 0; sessionTurns = 0;
+  history = []; turn = 0; sessionTurns = 0; session = {};
   messagesEl.querySelectorAll('.msg, .working').forEach((n) => n.remove());
   $('#welcome').hidden = false;
   $('#trace').innerHTML = '<p class="muted">Each step the agent takes — tool calls, inputs and results — appears here.</p>';
@@ -55,18 +57,26 @@ function traceTurn(text) {
   traceEl.appendChild(l);
 }
 const stepEls = new Map();
+const lastChild = new Map();
 function traceStart(call, step) {
   const el = document.createElement('details');
-  el.className = 'step running';
-  el.innerHTML = `<summary><span>${TOOL_LABELS[call.name] || '🔧'}</span><code>${call.name}</code><span class="status">running…</span></summary>
+  const sub = call.agent && call.agent !== 'orchestrator' && AGENTS[call.agent];
+  const isDelegation = !!AGENT_BY_TOOL[call.name];
+  el.className = `step running${sub ? ' nested' : ''}${isDelegation ? ' delegation' : ''}`;
+  const who = sub ? `<span class="agent-badge">${sub.emoji} ${sub.name}</span>` : isDelegation ? '<span class="agent-badge orch">🤖 Orchestrator →</span>' : '';
+  el.innerHTML = `<summary>${who}<span>${isDelegation ? AGENTS[AGENT_BY_TOOL[call.name]].emoji + ' ' + AGENTS[AGENT_BY_TOOL[call.name]].name : TOOL_LABELS[call.name] || '🔧'}</span>${isDelegation ? '' : `<code>${call.name}</code>`}<span class="status">running…</span></summary>
     <div class="k">step ${step} · input</div><pre>${escapeHtml(JSON.stringify(call.input, null, 2))}</pre>`;
-  traceEl.appendChild(el);
+  // Nest an agent's own tool calls directly under the delegation that started it.
+  const parent = call.parentId && stepEls.get(call.parentId);
+  if (parent) { const after = lastChild.get(call.parentId) || parent; after.after(el); lastChild.set(call.parentId, el); }
+  else traceEl.appendChild(el);
   traceEl.scrollTop = traceEl.scrollHeight;
   stepEls.set(call.id, el);
 }
 function traceEnd(call, content, isError) {
   const el = stepEls.get(call.id); if (!el) return;
-  el.className = `step ${isError ? 'failed' : 'done'}`;
+  el.classList.remove('running');
+  el.classList.add(isError ? 'failed' : 'done');
   el.querySelector('.status').textContent = isError ? 'error' : 'done';
   let pretty = content;
   try { pretty = JSON.stringify(JSON.parse(content), null, 2); } catch { /* keep raw */ }
@@ -117,17 +127,17 @@ async function send(text, opts = {}) {
   const searchSuggestions = [];
   try {
     await (CONFIG.PREVIEW ? runPreview : runAgent)({
-      settings, history, userText: text, images, scenarioId: opts.scenarioId,
+      settings, history, userText: text, images, scenarioId: opts.scenarioId, session,
       hooks: {
         onText: (t, isFinal) => {
           const el = addMessage('assistant', renderMarkdown(t), isFinal ? '' : 'interim');
           messagesEl.appendChild(working); // keep indicator last
           if (isFinal) working.remove(); else el.scrollIntoView({ block: 'end' });
         },
-        onToolStart: (call, step) => { setStatus(`${TOOL_LABELS[call.name] || call.name}…`); traceStart(call, step); },
+        onToolStart: (call, step) => { setStatus(`${call.agent && AGENTS[call.agent] ? AGENTS[call.agent].emoji + ' ' + AGENTS[call.agent].name + ': ' : ''}${TOOL_LABELS[call.name] || call.name}…`); traceStart(call, step); },
         onToolEnd: (call, content, isError) => { traceEnd(call, content, isError); setStatus('Thinking…'); if (!isError) updateMapFromTool(call.name, content); },
         onDisplay: (d) => { if (d.searchSuggestionsHtml) searchSuggestions.push(d.searchSuggestionsHtml); },
-        onCapped: (n, max) => traceEl.insertAdjacentHTML('beforeend', `<div class="step failed"><summary>⛔ ${n} extra tool call(s) skipped: limit of ${max} per message</summary></div>`),
+        onCapped: (n, max, role) => traceEl.insertAdjacentHTML('beforeend', `<div class="step failed"><summary>⛔ ${n} extra tool call(s) skipped: ${role === 'orchestrator' || !AGENTS[role] ? 'orchestrator' : AGENTS[role].name} limit of ${max} per message</summary></div>`),
         confirm: (call, label) => { setStatus('Waiting for your approval…'); return askApproval(call, label, working); },
       },
     });
@@ -423,3 +433,36 @@ async function runScenario(sc) {
 }
 renderScenarios();
 $('#openScenarios').addEventListener('click', () => { if (busy) return; resetChat(); setTimeout(() => $('.scenarios').scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); });
+
+// ---------- Step 3: "Craving for…" ----------
+const CRAVINGS = [
+  ['noodles', '🍜 Noodles'], ['something spicy', '🌶️ Something spicy'], ['seafood', '🦐 Seafood'], ['BBQ', '🍖 BBQ'],
+  ['tacos', '🌮 Tacos'], ['pizza', '🍕 Pizza'], ['soup', '🍲 Soup'], ['sushi', '🍣 Sushi'], ['curry', '🍛 Curry'],
+  ['a burger', '🍔 Burger'], ['something light and healthy', '🥗 Something light'], ['something sweet', '🍰 Something sweet'],
+  ['comfort food', '🫶 Comfort food'], ['a local specialty', '📍 Local specialty'], ['something cheap (under $15)', '💵 Cheap eats'],
+];
+const cravingSel = new Set();
+function renderCravings() {
+  $('#cravingChips').innerHTML = CRAVINGS.map(([v, label]) =>
+    `<button type="button" class="toggle ${cravingSel.has(v) ? 'on' : ''}" data-v="${escapeHtml(v)}" aria-pressed="${cravingSel.has(v)}">${label}</button>`).join('');
+  $('#cravingChips').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+    cravingSel.has(b.dataset.v) ? cravingSel.delete(b.dataset.v) : cravingSel.add(b.dataset.v);
+    renderCravings();
+  }));
+}
+renderCravings();
+$('#cravingForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const typed = $('#cravingInput').value.trim();
+  const items = [...cravingSel, ...(typed ? [typed] : [])];
+  if (!items.length) { $('#cravingInput').focus(); $('#cravingInput').placeholder = 'Pick a chip or type what you\'re craving…'; return; }
+  const msg = `Craving for: ${items.join(', ')}. What should I order, and where?`;
+  cravingSel.clear(); renderCravings(); $('#cravingInput').value = '';
+  send(msg);
+});
+
+// ---------- "Your agent team" strip ----------
+$('#agentTeam').innerHTML = '<div class="team-title">Your agent team</div><div class="team-row">'
+  + `<div class="team-card orch"><span>🤖</span><b>Orchestrator</b><small>Plans and answers</small></div>`
+  + Object.values(AGENTS).map((a) => `<div class="team-card"><span>${a.emoji}</span><b>${escapeHtml(a.name)}</b><small>${escapeHtml(a.goal)}</small></div>`).join('')
+  + '</div>';
