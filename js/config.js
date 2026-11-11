@@ -20,6 +20,11 @@ export const CONFIG = {
     MAX_TURNS_PER_SESSION: 20,    // messages per chat
   },
 
-  // true = replay sample scenarios with no Gemini calls (for demos before the proxy is set up).
-  PREVIEW: false,
+  // Demo mode (sample data, no Gemini calls). 'auto' = demo until PROXY_URL above is set to your Worker,
+  // then the full agent switches on by itself. Use true/false to force it.
+  PREVIEW: 'auto',
 };
+
+if (CONFIG.PREVIEW === 'auto') {
+  CONFIG.PREVIEW = !CONFIG.PROXY_URL || CONFIG.PROXY_URL.includes('YOUR-SUBDOMAIN');
+}
