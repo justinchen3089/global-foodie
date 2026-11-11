@@ -2,7 +2,7 @@
 // it is published on GitHub Pages and anyone can read it.
 export const CONFIG = {
   // URL of your deployed Cloudflare Worker that holds the Gemini key (see README → "Set up your Gemini key").
-  PROXY_URL: 'https://global-foodie-proxy.YOUR-SUBDOMAIN.workers.dev',
+  PROXY_URL: 'https://global-foodie-proxy.justinchen3089-globalfoodie.workers.dev',
 
   // Optional: a Google Maps *Embed API* key (a separate key, restricted to your github.io site).
   // Leave empty to use Google Maps' keyless embed, which works for basic maps and searches.
