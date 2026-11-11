@@ -18,12 +18,12 @@ Global Foodie helps travelers abroad decide **what to order**. It works from whe
 ### Pre-share checklist
 - [ ] Repo pushed to GitHub, Pages source set to **GitHub Actions**, secrets added
 - [ ] Worker deployed (Actions → Deploy proxy), `ALLOWED_ORIGINS` contains `https://YOUR-USERNAME.github.io`
-- [ ] `js/config.js`: `PROXY_URL` set, `PREVIEW: false`
+- [ ] Repository variable `PROXY_URL` set and the Pages workflow re-run (the demo banner is gone)
 - [ ] Spending cap or budget alert set on the Gemini key in Google AI Studio / Cloud Console
 - [ ] Open the link on your phone with Wi-Fi **off**, and send a message: it answers
 - [ ] Ask it to remember an allergy: the 🔒 approval card shows the arguments
 - [ ] Ran the eval (Actions → Evaluation, or locally), committed `eval/results/`, and wrote the failure explanations in `report.md`
-- [ ] Filled in your name in `GOVERNANCE.md` and your username in the footer link in `index.html`
+- [ ] Filled in your name in `GOVERNANCE.md`
 
 ## 1. Business problem
 
@@ -161,25 +161,36 @@ Run it locally:
 python3 -m http.server 8000     # from the project folder, then open http://localhost:8000
 ```
 
-### Connect to GitHub (deploys run automatically)
+### Publish on GitHub Pages (no code edits needed)
 
-1. Create an empty **public** repository named `global-foodie` on GitHub (no README).
-2. Push this folder:
+**A. Put the site online (about 5 minutes; it starts in demo mode)**
+1. On github.com, create a new **public** repository named `global-foodie`. Leave it empty: no README, license or .gitignore.
+2. In that repo, go to **Settings → Pages → Build and deployment → Source** and choose **GitHub Actions**. Do this before pushing.
+3. Push this folder from your computer. It already contains a git repository:
    ```bash
+   cd global-foodie
    git remote add origin https://github.com/<you>/global-foodie.git
    git push -u origin main
    ```
-3. Go to **Settings → Pages → Build and deployment → Source: GitHub Actions**. Every push to `main` now publishes the site to `https://<you>.github.io/global-foodie/` (`.github/workflows/pages.yml`). Only `index.html`, `style.css` and `js/` are published.
-4. Under **Settings → Secrets and variables → Actions**, add the repository secrets. Keys live only here and in Cloudflare, never in the code:
-   - `GEMINI_API_KEY`: used by the proxy deploy and the eval
-   - `CLOUDFLARE_API_TOKEN` (template "Edit Cloudflare Workers") and `CLOUDFLARE_ACCOUNT_ID`: let `.github/workflows/deploy-proxy.yml` deploy the Worker and store the Gemini key in it whenever `proxy/` changes. Run it once by hand from the **Actions** tab.
-5. **Evaluation on GitHub:** every push runs the no-key self-test. Go to **Actions → Evaluation → Run workflow** to run the real pass@1 / pass^k eval against Gemini. The report appears on the run page and as a downloadable artifact (`.github/workflows/eval.yml`).
+   If git asks for a password, use GitHub Desktop, run `gh auth login`, or use a personal access token (not your GitHub password).
+4. Open the **Actions** tab and wait for the green ✓ on "Deploy site to GitHub Pages". Your site is live at **`https://<you>.github.io/global-foodie/`** and runs in demo mode.
+
+**B. Switch on the full Gemini agent (about 10 minutes, one time)**
+1. Create a free account at cloudflare.com. Go to **My Profile → API Tokens → Create Token → "Edit Cloudflare Workers"** template, and copy the token. Then copy your **Account ID** from **Workers & Pages**.
+2. In the repo, go to **Settings → Secrets and variables → Actions → Secrets** and add:
+   - `GEMINI_API_KEY`
+   - `CLOUDFLARE_API_TOKEN`
+   - `CLOUDFLARE_ACCOUNT_ID`
+3. Go to **Actions → "Deploy proxy (Cloudflare Worker)" → Run workflow**. When it finishes, copy the `https://global-foodie-proxy.<…>.workers.dev` address from its log. The Worker only accepts requests from your `github.io` site, and the workflow sets that up automatically.
+4. Go to **Settings → Secrets and variables → Actions → Variables → New variable**: name `PROXY_URL`, value the address from step 3.
+5. Go to **Actions → "Deploy site to GitHub Pages" → Run workflow**. The site now runs the full agent: the demo banner disappears.
+6. Test it on your phone with Wi-Fi off. Set a spending cap on your Gemini key in Google AI Studio.
 
 | Workflow | Runs when | Does |
 |---|---|---|
-| `pages.yml` | push to `main` | Publishes the website to GitHub Pages |
-| `deploy-proxy.yml` | `proxy/` changes, or by hand | Deploys the Cloudflare Worker with the Gemini key as a secret |
-| `eval.yml` | push (self-test) / by hand (real eval) | Runs the evaluation harness and publishes the report |
+| `pages.yml` | push to `main`, or by hand | Publishes the site, using the `PROXY_URL` variable if it's set |
+| `deploy-proxy.yml` | `proxy/` changes, or by hand | Deploys the Worker with your key as an encrypted secret. Skips cleanly until the secrets exist |
+| `eval.yml` | push (no-key self-test) / by hand (real eval) | Runs the evaluation harness. The report appears on the run's page |
 
 Search grounding note: Google's terms require showing its "Search Suggestions" alongside answers that used Google Search. Global Foodie shows them under the reply in a sandboxed frame.
 

@@ -479,3 +479,10 @@ $('#foodInput').addEventListener('change', async (e) => {
   renderAttachments();
   send(UPLOAD_PROMPTS[uploadKind]);
 });
+
+// Footer link to the governance note in this site's own GitHub repo (works out <user>/<repo> from the github.io address).
+{
+  const m = location.hostname.match(/^([^.]+)\.github\.io$/);
+  const repo = location.pathname.split('/').filter(Boolean)[0];
+  if (m) $('#govLink').href = `https://github.com/${m[1]}/${repo || `${m[1]}.github.io`}/blob/main/GOVERNANCE.md`;
+}

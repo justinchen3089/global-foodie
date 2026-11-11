@@ -1,8 +1,9 @@
-# Deploys the Cloudflare Worker proxy when proxy/ changes (or when run by hand).
+# Deploys the Cloudflare Worker that keeps your Gemini key secret.
 # Repo secrets needed (Settings → Secrets and variables → Actions):
-#   CLOUDFLARE_API_TOKEN  – Cloudflare token with "Edit Cloudflare Workers" permission
-#   CLOUDFLARE_ACCOUNT_ID – from the Cloudflare dashboard
-#   GEMINI_API_KEY        – your Gemini key (stored by Cloudflare as an encrypted Worker secret)
+#   GEMINI_API_KEY        – from aistudio.google.com (stored by Cloudflare as an encrypted Worker secret)
+#   CLOUDFLARE_API_TOKEN  – Cloudflare API token, template "Edit Cloudflare Workers"
+#   CLOUDFLARE_ACCOUNT_ID – shown on the Cloudflare dashboard (Workers & Pages overview)
+# The Worker only accepts requests from https://<your-username>.github.io (filled in automatically).
 name: Deploy proxy (Cloudflare Worker)
 
 on:
@@ -14,14 +15,28 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      HAS_SECRETS: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' && secrets.GEMINI_API_KEY != '' }}
     steps:
+      - name: Secrets missing? Skip for now
+        if: env.HAS_SECRETS != 'true'
+        run: echo "::notice::Skipped. Add GEMINI_API_KEY, CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID as repository secrets, then run this workflow from the Actions tab."
       - uses: actions/checkout@v4
+        if: env.HAS_SECRETS == 'true'
+      - name: Work out your GitHub Pages address
+        if: env.HAS_SECRETS == 'true'
+        run: echo "SITE_ORIGIN=https://$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]').github.io" >> "$GITHUB_ENV"
       - uses: cloudflare/wrangler-action@v3
+        if: env.HAS_SECRETS == 'true'
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: proxy
+          command: deploy --var ALLOWED_ORIGINS:${{ env.SITE_ORIGIN }},http://localhost:8000
           secrets: |
             GEMINI_API_KEY
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      - name: Next step
+        if: env.HAS_SECRETS == 'true'
+        run: echo "::notice::Copy the https://global-foodie-proxy.<...>.workers.dev URL printed above into a repository VARIABLE named PROXY_URL, then re-run 'Deploy site to GitHub Pages'."

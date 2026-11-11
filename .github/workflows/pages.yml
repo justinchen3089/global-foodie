@@ -1,5 +1,7 @@
 # Publishes the website (only the public site files) to GitHub Pages on every push to main.
 # One-time setup: repo Settings → Pages → Build and deployment → Source: "GitHub Actions".
+# Optional repo variable PROXY_URL (Settings → Secrets and variables → Actions → Variables):
+#   your Cloudflare Worker URL. When set, the site runs the full Gemini agent; when not, it runs in demo mode.
 name: Deploy site to GitHub Pages
 
 on:
@@ -28,6 +30,13 @@ jobs:
         run: |
           mkdir _site
           cp -r index.html style.css js .nojekyll _site/
+      - name: Point the site at the Gemini proxy (if the PROXY_URL variable is set)
+        if: ${{ vars.PROXY_URL != '' }}
+        env:
+          PROXY_URL: ${{ vars.PROXY_URL }}
+        run: |
+          sed -i "s#https://global-foodie-proxy.YOUR-SUBDOMAIN.workers.dev#${PROXY_URL%/}#" _site/js/config.js
+          grep -n "PROXY_URL:" _site/js/config.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
