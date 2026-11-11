@@ -7,6 +7,10 @@ compatibility_date = "2026-10-01"
 ALLOWED_ORIGINS = "https://YOUR-USERNAME.github.io,http://localhost:8000"
 # "gemini-flash-latest" always points at Google's current Flash model. Pin a specific model if you prefer.
 GEMINI_MODEL = "gemini-flash-latest"
+# "low" keeps answers fast (Gemini 3.x defaults to "high" thinking, which can time out). minimal | low | medium | high | off
+THINKING_LEVEL = "low"
+# Used when the main model is overloaded (HTTP 503/429). Set to "" to disable.
+FALLBACK_MODEL = "gemini-flash-lite-latest"
 
 # Per-visitor rate limit (60 model requests / minute per IP; one message uses ~5–15) so nobody can drain your quota.
 [[ratelimits]]

@@ -85,11 +85,46 @@ export default {
 
     const model = env.GEMINI_MODEL || 'gemini-flash-latest';
     const path = new URL(request.url).pathname.replace(/\/+$/, '');
-    const callGemini = (payload) => fetch(`${GEMINI}/${model}:generateContent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
-      body: JSON.stringify(payload),
-    });
+    // Keep answers fast: Gemini 3.x defaults to "high" thinking, which can exceed Cloudflare's 100 s limit.
+    // THINKING_LEVEL (minimal | low | medium | high) can override; set it to "off" for models without thinking levels.
+    const thinkingLevel = env.THINKING_LEVEL || 'low';
+    const callModel = async (modelName, payload) => {
+      const body = { ...payload };
+      if (thinkingLevel !== 'off') body.generationConfig = { ...(payload.generationConfig || {}), thinkingConfig: { thinkingLevel } };
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), (+env.GEMINI_TIMEOUT_MS || 45000));
+      try {
+        return await fetch(`${GEMINI}/${modelName}:generateContent`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
+          body: JSON.stringify(body),
+          signal: ctrl.signal,
+        });
+      } catch (e) {
+        const msg = e.name === 'AbortError' ? 'Gemini took too long to answer. Please try again, or ask a simpler question.' : `Could not reach Gemini: ${e.message}`;
+        return new Response(JSON.stringify({ error: { message: msg } }), { status: 504, headers: { 'Content-Type': 'application/json' } });
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+    // Google sometimes answers 503 "high demand" / 429 / 500. Retry the main model twice,
+    // then fall back to a lighter model so travelers still get an answer.
+    const fallbackModel = env.FALLBACK_MODEL || 'gemini-flash-lite-latest';
+    const busy = (s) => s === 429 || s === 500 || s === 503 || s === 504;
+    const callGemini = async (payload) => {
+      let res;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        if (attempt) await new Promise((r) => setTimeout(r, 1200 * attempt));
+        res = await callModel(model, payload);
+        if (!busy(res.status)) return res;
+        if (res.status === 504) break; // a timeout: don't wait again on the same model (stay under Cloudflare's 100 s)
+      }
+      if (fallbackModel && fallbackModel !== model) {
+        const fb = await callModel(fallbackModel, payload);
+        if (fb.ok) return fb;
+      }
+      return res;
+    };
 
     if (path === '/chat') {
       const capError = checkCaps(body.contents);
