@@ -19,32 +19,18 @@
       <div><b>Global Foodie</b><small>Your agentic food guide abroad</small></div>
     </div>
     <div class="top-actions">
-      <button id="toggleSide" class="ghost only-mobile" aria-label="Show agent panel">🧠</button>
       <button id="openScenarios" class="ghost">🧳<span class="label"> Scenarios</span></button>
       <button id="newChat" class="ghost">New chat</button>
     </div>
   </header>
 
+  <nav class="view-switch" id="viewSwitch" aria-label="Switch between chat and map">
+    <button type="button" data-show="chat" class="active">💬 Chat</button>
+    <button type="button" data-show="map">🗺️ Map <span id="mapBadge" class="badge" hidden></span></button>
+  </nav>
+
   <main class="layout">
     <section class="chat">
-      <div id="mapCard" class="map-card" hidden>
-        <div class="map-head">
-          <span id="mapPlace"></span>
-          <span id="mapCount" class="muted small"></span>
-          <div class="map-tabs" role="tablist">
-            <button type="button" data-view="google">Google Maps</button>
-            <button type="button" data-view="pins">Pins</button>
-          </div>
-          <button type="button" id="mapChange" class="ghost small">Change</button>
-          <button type="button" id="mapToggle" class="ghost small" aria-label="Hide map">▴</button>
-        </div>
-        <div id="mapBody">
-          <div id="gmap" class="map gmap"></div>
-          <div id="map" class="map" hidden></div>
-          <div id="placeList" class="place-list" hidden></div>
-        </div>
-      </div>
-
       <div id="messages" class="messages" aria-live="polite">
         <div class="welcome" id="welcome">
           <h1>Not sure what to order?</h1>
@@ -124,11 +110,36 @@
           <textarea id="input" rows="1" placeholder="Craving for… (e.g. spicy noodles), or ask anything"></textarea>
           <button id="sendBtn" type="submit" class="primary">Send</button>
         </div>
-        <p class="composer-note">Class demo · messages are sent to Google Gemini, so don't share sensitive personal info · always confirm allergens with restaurant staff · <a id="govLink" href="https://github.com/" target="_blank" rel="noopener">How your data is handled</a></p>
+        <p class="composer-note">Class demo · messages are sent to Google Gemini, so don't share sensitive personal info · always confirm allergens with restaurant staff · <a id="govLink" href="https://github.com/" target="_blank" rel="noopener">How your data is handled</a> · <button type="button" id="clearData" class="linklike">Clear my saved data</button> · <span id="buildInfo" title="Version of the site that is live">version: local</span></p>
       </form>
     </section>
 
-    <aside class="side" id="side">
+    <aside class="mapside" id="mapCard" aria-label="Map of restaurants near you">
+      <div class="map-head">
+        <span id="mapPlace">📍 Location not set</span>
+        <button type="button" id="mapChange" class="ghost small">Change</button>
+      </div>
+      <div class="map-tabs-row">
+        <div class="map-tabs" role="tablist">
+          <button type="button" data-view="google">Google Maps</button>
+          <button type="button" data-view="pins">Pins</button>
+        </div>
+        <span id="mapCount" class="muted small"></span>
+      </div>
+      <div id="mapEmpty" class="map-empty">
+        <div class="map-empty-icon">🗺️</div>
+        <b>Your map appears here</b>
+        <p>Share your location (step 1) and the restaurants Global Foodie finds for you will show up on the map and in a list.</p>
+      </div>
+      <div id="mapBody" hidden>
+        <div id="gmap" class="map gmap"></div>
+        <div id="map" class="map" hidden></div>
+        <div id="placeList" class="place-list" hidden></div>
+      </div>
+    </aside>
+
+    <!-- Developer view, hidden from travelers. Open the site with ?debug (or #debug) to show it. -->
+    <aside class="side" id="side" hidden>
       <nav class="tabs" role="tablist">
         <button role="tab" data-tab="trace" class="active">Agent trace</button>
         <button role="tab" data-tab="memory">Memory</button>

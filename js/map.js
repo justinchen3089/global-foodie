@@ -58,7 +58,8 @@ export function showLocation({ lat, lon, place, sample = false }) {
   state.places = [];
   state.focus = null;
   state.googleQuery = 'restaurants';
-  $('mapCard').hidden = false;
+  $('mapEmpty').hidden = true;
+  $('mapBody').hidden = false;
   $('mapPlace').textContent = `📍 ${state.place}`;
   if (!state.view) setView(sample ? 'pins' : 'google');
   else render(true);
@@ -72,7 +73,13 @@ export function showRestaurants(list = [], label = 'Nearby restaurants', googleQ
   $('mapCount').textContent = state.places.length ? `${label}: ${state.places.length}` : '';
   render(false);
   renderList();
+  window.dispatchEvent(new CustomEvent('globalfoodie:places', { detail: { count: state.places.length, label } }));
 }
+
+export const hasLocation = () => !!state.center;
+let actions = { onAsk: null };
+/** onAsk(place): called when the traveler taps "Ask about it" on a place card. */
+export function setPlaceActions(a) { actions = { ...actions, ...a }; }
 
 export function refreshMap() { render(false); }
 
@@ -84,11 +91,14 @@ export function setView(view) {
   render(false);
 }
 
-function focusPlace(i) {
+export function focusPlace(i) {
+  if (!state.places[i]) return false;
   state.focus = state.places[i];
-  document.querySelectorAll('.place-list button').forEach((b, j) => b.classList.toggle('active', j === i));
+  document.querySelectorAll('.place-card').forEach((c, j) => c.classList.toggle('active', j === i));
   if (state.view === 'google') renderGoogle();
   else if (lmap && pinLayer) pinLayer.getLayers()[i]?.openPopup();
+  document.querySelectorAll('.place-card')[i]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  return true;
 }
 
 // ---------- Rendering ----------
@@ -101,10 +111,22 @@ function render(recenter) {
 
 function renderList() {
   const el = $('placeList');
-  el.innerHTML = state.places.map((p, i) =>
-    `<button type="button" data-i="${i}"><span class="n">${i + 1}</span>${esc(p.name)} <span class="muted">· ${esc(dist(p))}</span></button>`).join('');
+  el.innerHTML = state.places.map((p, i) => `
+    <div class="place-card">
+      <span class="n">${i + 1}</span>
+      <div class="place-info">
+        <b>${esc(p.name)}</b>
+        <small>${esc((p.cuisine || '').replace(/[;_]/g, (c) => (c === ';' ? ', ' : ' ')))} · ${esc(dist(p))}${p.walk_min ? ` · ${p.walk_min} min walk` : ''}</small>
+      </div>
+      <div class="place-actions">
+        <button type="button" data-act="show" data-i="${i}" title="Show on map">📍</button>
+        <button type="button" data-act="ask" data-i="${i}">Ask about it</button>
+        <a href="${esc(p.maps_url)}" target="_blank" rel="noopener" title="Directions in Google Maps">↗</a>
+      </div>
+    </div>`).join('');
   el.hidden = !state.places.length;
-  el.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => focusPlace(+b.dataset.i)));
+  el.querySelectorAll('button[data-act="show"]').forEach((b) => b.addEventListener('click', () => focusPlace(+b.dataset.i)));
+  el.querySelectorAll('button[data-act="ask"]').forEach((b) => b.addEventListener('click', () => actions.onAsk?.(state.places[+b.dataset.i])));
 }
 
 function popupHtml(p, i) {

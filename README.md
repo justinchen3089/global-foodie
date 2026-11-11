@@ -10,7 +10,7 @@ Global Foodie helps travelers abroad decide **what to order**. It works from whe
 | **Expansion beyond Milestone I** | **Multi-agent:** an orchestrator plus five specialist agents (Memory, Google Search, Image, Geolocation, Allergy). Each has its own prompt, tools and budget, with a written reason for each (section 3). Also **memory** (a persistent profile and order history) and real tools (Google Search grounding, OpenStreetMap, an embedded Google Map). *(Edit to match what your Milestone I had.)* |
 | **Evaluation (pass@1 / pass^k)** | [`eval/`](eval/README.md): 16 cases (4 adversarial, 4 edge, including a menu photo) × 3 trials. Run `GEMINI_API_KEY=… node eval/run_eval.mjs`, and the report goes to `eval/results/report.md` |
 | **Governance note** | [`GOVERNANCE.md`](GOVERNANCE.md) |
-| **Human gate** | Approve/Deny card in the chat, showing the tool name and JSON arguments, before `remember`, `forget`, `log_choice` and `get_current_location` |
+| **Human gate** | An Approve/Deny card in the chat, showing the action and every argument with its exact value, before `remember`, `forget`, `log_choice` and `get_current_location` |
 | **Cost caps** | Per message: 8 orchestrator calls, 18 model calls and 24 tool calls across all agents, plus a per-agent step limit. Per chat: 20 messages. Per answer: 2,048 output tokens. Per IP: 60 requests per minute. Per request: 8 MB. Enforced in the browser (`js/config.js`, `js/agents.js`) **and** on the server (`proxy/worker.js`) |
 | **Keys** | Only as a Cloudflare secret (`wrangler secret put GEMINI_API_KEY`). Never in the repo or the UI |
 | **Nothing real connected** | No email, payments, bookings or deletions. Tools only read public data or write to the visitor's own browser |
@@ -96,16 +96,18 @@ flowchart TB
 
 **How a message flows.** The traveler picks what they're craving ("Craving for: noodles, something spicy"). The orchestrator plans and calls the agents it needs as tools. Independent agents run **in parallel**: for example the Geolocation and Google Search agents together, then the Allergy agent with all candidate dishes. Each agent runs its own Gemini tool-calling loop with its own prompt, tools and step budget, and returns a short report. The orchestrator combines the reports into the answer.
 
-Memory writes and GPS still pause at the 🔒 **approval gate**, whichever agent asks. The **Agent trace** panel shows each delegation, with that agent's own tool calls nested under it.
+Memory writes and GPS still pause at the 🔒 **approval gate**, whichever agent asks.
+
+**What travelers see:** the chat on the left and the map on the right: an embedded Google Map or numbered pins, plus a list of places with **Ask about it** buttons. On phones there's a **💬 Chat / 🗺️ Map** switch. Mentions like "pin 2" in an answer are buttons that jump to that place. Code, the agent trace and the memory panel are hidden from travelers. **Developer view:** open the site with `?debug` (for example `https://<you>.github.io/global-foodie/?debug`) to show the **Agent trace**, with each delegation and that agent's tool calls nested under it, and the **Memory** panel. Use this for demos and grading.
 
 ### The five agents
 
 | # | Agent (design goal) | What it does | Tools (only these) | Where you see it | Eval cases |
 |---|---|---|---|---|---|
-| 1 | 🧠 **Memory agent**: remember the traveler's preferences and previous choices | **Recall:** reads the profile and order history and reports what's relevant ("you rated the khao soi 5★ last time"). **Save:** stores allergies, diets, likes, dislikes, spice tolerance and the dish you chose. Saving goes through the approval gate. | `get_memory`, `remember`, `forget`, `log_choice` | **Memory** tab; "🧠 Based on my past choices" | C09, C13 |
+| 1 | 🧠 **Memory agent**: remember the traveler's preferences and previous choices | **Recall:** reads the profile and order history and reports what's relevant ("you rated the khao soi 5★ last time"). **Save:** stores allergies, diets, likes, dislikes, spice tolerance and the dish you chose. Saving goes through the approval gate. | `get_memory`, `remember`, `forget`, `log_choice` | "🧠 Based on my past choices"; Memory panel in `?debug` | C09, C13 |
 | 2 | 🔎 **Google Search agent**: research dishes, ingredients, cultural context, restaurants | Checks the built-in database first, then makes up to 3 web searches through **Gemini with Google Search grounding** (sourced answers), plus Wikipedia for summaries and dish photos. Reports ingredients, allergens, spice, how to order and cultural notes, with source links. | `lookup_dish`, `research_web` | Source links in answers; Google search suggestions | C05, C15 |
 | 3 | 📷 **Image agent**: understand menu photos and dish photos | Gets the photo (the orchestrator doesn't, which saves tokens). For a **menu**, it transcribes and translates every item with prices and likely ingredients. For a **dish**, it identifies it with a confidence level. It leaves safety to the Allergy agent. | Gemini vision, `lookup_dish` | "📷 Upload my food" / "📜 Upload a menu" in step 3; 📷 in the chat box | **C16** |
-| 4 | 📍 **Geolocation agent**: determine where the traveler is | Uses the saved location, a typed place or GPS (with approval). Finds restaurants that fit the craving (OpenStreetMap), with distance in miles and walking time, and puts them on an **embedded Google Map**, a pins map and a list. | `get_current_location`, `geocode_location`, `find_nearby_restaurants` | Map card at the top | C01–C08, C10 |
+| 4 | 📍 **Geolocation agent**: determine where the traveler is | Uses the saved location, a typed place or GPS (with approval). Finds restaurants that fit the craving (OpenStreetMap), with distance in miles and walking time, and puts them on an **embedded Google Map**, a pins map and a list. | `get_current_location`, `geocode_location`, `find_nearby_restaurants` | Map column (desktop) / 🗺️ Map tab (phone) | C01–C08, C10 |
 | 5 | 🛡️ **Allergy agent**: cross-check potential allergens | Checks **every candidate dish in one batch** against 22 allergens and diets (FDA Big 9, EU 14, gluten, corn, coconut, alpha-gal, vegetarian, vegan, halal, kosher…) plus any allergy the user typed. Gives a ⛔ / ⚠️ / ✅ verdict with evidence, and never softens an "avoid". | `check_allergens`, `lookup_dish` | ✅ / ⚠️ / ⛔ in answers; "Show this to staff" card | C01, C03–C07, C11, C15, C16 |
 
 **🤖 Orchestrator:** turns the craving into dishes and flavors (`recommend_by_taste` over 86 dishes, 34 of them U.S. regional), decides which agents to call, enforces the safety rules, and writes the final answer.
@@ -185,6 +187,8 @@ python3 -m http.server 8000     # from the project folder, then open http://loca
 4. Go to **Settings → Secrets and variables → Actions → Variables → New variable**: name `PROXY_URL`, value the address from step 3.
 5. Go to **Actions → "Deploy site to GitHub Pages" → Run workflow**. The site now runs the full agent: the demo banner disappears.
 6. Test it on your phone with Wi-Fi off. Set a spending cap on your Gemini key in Google AI Studio.
+
+**Updates are automatic:** every push to `main` republishes the website within about a minute, and changes under `proxy/` redeploy the key server. The footer shows the live version (`version <commit> · <time> UTC`), so you can confirm an update went out.
 
 | Workflow | Runs when | Does |
 |---|---|---|

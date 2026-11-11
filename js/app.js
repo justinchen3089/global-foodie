@@ -6,7 +6,7 @@ import { CONFIG } from './config.js';
 import { runPreview, previewLocate, sampleRestaurants, setScenarioLocation } from './preview.js';
 import { SCENARIOS } from './scenarios.js';
 import { AGENTS, AGENT_BY_TOOL } from './agents.js';
-import { showLocation, showRestaurants, refreshMap } from './map.js';
+import { showLocation, showRestaurants, refreshMap, hasLocation, focusPlace, setPlaceActions } from './map.js';
 
 const $ = (s) => document.querySelector(s);
 
@@ -129,7 +129,7 @@ async function send(text, opts = {}) {
       settings, history, userText: text, images, scenarioId: opts.scenarioId, session,
       hooks: {
         onText: (t, isFinal) => {
-          const el = addMessage('assistant', renderMarkdown(t), isFinal ? '' : 'interim');
+          const el = addMessage('assistant', linkPins(renderMarkdown(t)), isFinal ? '' : 'interim');
           messagesEl.appendChild(working); // keep indicator last
           if (isFinal) working.remove(); else el.scrollIntoView({ block: 'end' });
         },
@@ -169,8 +169,8 @@ function askApproval(call, label, workingEl) {
   return new Promise((resolve) => {
     const card = addMessage('assistant', `<div class="gate">
       <div class="gate-title">🔒 Approval needed: ${escapeHtml(label)}</div>
-      <div class="small muted">The agent wants to run this tool with these exact arguments. Nothing happens until you choose.</div>
-      <pre class="gate-args"><span class="gate-fn">${escapeHtml(call.name)}</span>(${escapeHtml(JSON.stringify(call.input || {}, null, 2))})</pre>
+      <div class="small muted">Global Foodie wants to do this with exactly these details. Nothing happens until you choose.</div>
+      <dl class="gate-args">${Object.entries(call.input || {}).map(([k, v]) => `<dt>${escapeHtml(k.replace(/_/g, ' '))}</dt><dd>${escapeHtml(typeof v === 'string' ? v : JSON.stringify(v))}</dd>`).join('') || '<dt>details</dt><dd>none</dd>'}</dl>
       <div class="gate-actions"><button type="button" class="primary" data-ok="1">Approve</button><button type="button" data-ok="0">Deny</button></div>
     </div>`, 'gate-msg');
     if (workingEl?.isConnected) messagesEl.appendChild(workingEl);
@@ -247,7 +247,6 @@ document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('cli
   document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('active', x === b));
   document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('active', p.id === b.dataset.tab));
 }));
-$('#toggleSide').addEventListener('click', () => $('#side').classList.toggle('open'));
 
 
 if (CONFIG.PREVIEW) {
@@ -345,16 +344,11 @@ async function setLocation(query) {
 $('#obGeo').addEventListener('click', () => setLocation());
 $('#obPlace').addEventListener('submit', (e) => { e.preventDefault(); const q = e.target.q.value.trim(); if (q) setLocation(q); });
 $('#mapChange').addEventListener('click', () => {
+  setView('chat');
   $('#welcome').hidden = false;
   $('#obLocation').classList.remove('done');
   $('#obPlace input').focus();
   messagesEl.scrollTop = 0;
-});
-$('#mapToggle').addEventListener('click', () => {
-  const m = $('#mapBody'); m.hidden = !m.hidden;
-  $('#mapToggle').textContent = m.hidden ? '▾' : '▴';
-  $('#mapToggle').setAttribute('aria-label', m.hidden ? 'Show map' : 'Hide map');
-  if (!m.hidden) refreshMap();
 });
 
 function renderDietChips() {
@@ -391,7 +385,7 @@ $('#obSkip').addEventListener('click', () => finishDiet('skipped'));
 
 function syncOnboarding() {
   const m = mem.loadMemory();
-  const hasLoc = !!m.last_location && !$('#mapCard').hidden;
+  const hasLoc = !!m.last_location && hasLocation();
   $('#obLocation').classList.toggle('done', hasLoc);
   $('#obDiet').classList.toggle('locked', !hasLoc);
   $('#obDiet').classList.toggle('done', hasLoc && dietDone);
@@ -485,4 +479,60 @@ $('#foodInput').addEventListener('change', async (e) => {
   const m = location.hostname.match(/^([^.]+)\.github\.io$/);
   const repo = location.pathname.split('/').filter(Boolean)[0];
   if (m) $('#govLink').href = `https://github.com/${m[1]}/${repo || `${m[1]}.github.io`}/blob/main/GOVERNANCE.md`;
+}
+
+// ---------- Layout: chat + map, debug view ----------
+const DEBUG = new URLSearchParams(location.search).has('debug') || location.hash === '#debug';
+if (DEBUG) { $('#side').hidden = false; document.body.classList.add('debug'); }
+
+function setView(view) {
+  document.body.dataset.view = view;
+  document.querySelectorAll('#viewSwitch button').forEach((b) => b.classList.toggle('active', b.dataset.show === view));
+  if (view === 'map') { $('#mapBadge').hidden = true; refreshMap(); }
+}
+document.querySelectorAll('#viewSwitch button').forEach((b) => b.addEventListener('click', () => setView(b.dataset.show)));
+setView('chat');
+
+// New places found: show a count on the phone's Map tab.
+window.addEventListener('globalfoodie:places', (e) => {
+  if (document.body.dataset.view !== 'map' && e.detail.count) { $('#mapBadge').textContent = e.detail.count; $('#mapBadge').hidden = false; }
+});
+
+// "pin 2" in an answer becomes a button that jumps to that place on the map.
+function linkPins(html) {
+  return html.replace(/\b([Pp]in)\s+(?:<strong>)?(\d{1,2})(?:<\/strong>)?/g, (_, word, n) => `<button type="button" class="pin-ref" data-pin="${n}" title="Show on the map">📍 ${word} ${n}</button>`);
+}
+messagesEl.addEventListener('click', (e) => {
+  const b = e.target.closest('.pin-ref');
+  if (!b) return;
+  if (window.matchMedia('(max-width: 860px)').matches) setView('map');
+  setTimeout(() => focusPlace(+b.dataset.pin - 1), 60);
+});
+
+// Place cards: "Ask about it" asks the agent about that restaurant.
+setPlaceActions({
+  onAsk: (p) => {
+    setView('chat');
+    send(`Tell me about ${p.name}${p.cuisine && p.cuisine !== 'unknown' ? ` (${p.cuisine.replace(/;/g, ', ')})` : ''}, ${p.distance_text || ''} away. What should I order there?`);
+  },
+});
+
+// Footer: clear everything saved in this browser (two clicks, no pop-up).
+{
+  const btn = $('#clearData');
+  let armed = false;
+  btn.addEventListener('click', () => {
+    if (!armed) { armed = true; btn.textContent = 'Click again to clear'; setTimeout(() => { armed = false; btn.textContent = 'Clear my saved data'; }, 4000); return; }
+    mem.clearMemory();
+    location.reload();
+  });
+}
+
+// Footer: when this version was published (GitHub Pages sends the file's last-modified time).
+{
+  const el = $('#buildInfo');
+  if (el && el.textContent.trim() === 'version: local' && location.hostname.endsWith('github.io')) {
+    const d = new Date(document.lastModified);
+    if (!isNaN(d)) el.textContent = `updated ${d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}`;
+  }
 }
