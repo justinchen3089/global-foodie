@@ -340,16 +340,16 @@
       "reference": "Got it. I saved your sesame allergy and will check every dish for sesame, tahini and sesame oil."
     },
     {
-      "id": "T07-menu-photo-peanut",
+      "id": "T07-chinese-menu-photo-peanut",
       "category": "edge",
-      "why": "Image search: the agent must read a menu PHOTO (no text given) and cross-check every item against a peanut allergy.",
+      "why": "Image search: the agent must read a Chinese menu PHOTO (Chinese characters + English, no text given) and cross-check every item against a peanut allergy.",
       "setup": {
         "allergies": [
           "peanut"
         ],
         "location": "nyc"
       },
-      "image": "eval/fixtures/thai-menu.png",
+      "image": "eval/fixtures/chinese-menu.png",
       "message": "I'm allergic to peanuts. What can I order from this menu?",
       "checks": {
         "must_call": [
@@ -358,20 +358,22 @@
         ],
         "avoid_verdicts_respected": true,
         "not_recommended": [
-          "Pad Thai",
-          "Som Tam",
-          "Massaman"
+          "Kung Pao",
+          "Dan Dan",
+          "Peanut Noodles"
         ],
         "answer_includes_any": [
           [
-            "Pad See Ew",
-            "Khao Soi",
-            "Tom Kha"
+            "Mapo Tofu",
+            "Xiaolongbao",
+            "Soup Dumpling",
+            "Hot & Sour",
+            "Hot and Sour"
           ],
           [
-            "Pad Thai",
-            "Som Tam",
-            "Massaman"
+            "Kung Pao",
+            "Dan Dan",
+            "Peanut Noodles"
           ]
         ]
       },
@@ -379,35 +381,61 @@
         {
           "name": "check_allergens",
           "args": {
-            "dish_name": "Pad Thai"
+            "dish_name": "Kung Pao Chicken"
           }
         },
         {
           "name": "check_allergens",
           "args": {
-            "dish_name": "Pad See Ew"
+            "dish_name": "Mapo Tofu"
           }
         },
         {
           "name": "check_allergens",
           "args": {
-            "dish_name": "Khao Soi"
+            "dish_name": "Dan Dan Noodles",
+            "ingredients": [
+              "wheat noodles",
+              "chili oil",
+              "pork",
+              "sesame paste",
+              "crushed peanuts"
+            ]
           }
         },
         {
           "name": "check_allergens",
           "args": {
-            "dish_name": "Tom Kha Gai"
+            "dish_name": "Xiaolongbao"
           }
         },
         {
           "name": "check_allergens",
           "args": {
-            "dish_name": "Massaman Curry"
+            "dish_name": "Cold Peanut Noodles",
+            "ingredients": [
+              "noodles",
+              "peanut butter sauce",
+              "cucumber",
+              "sesame"
+            ]
+          }
+        },
+        {
+          "name": "check_allergens",
+          "args": {
+            "dish_name": "Hot and Sour Soup",
+            "ingredients": [
+              "tofu",
+              "mushrooms",
+              "egg",
+              "vinegar",
+              "white pepper"
+            ]
           }
         }
       ],
-      "reference": "From the Baan Siam Kitchen menu:\n1. **Pad See Ew**: ✅ no known peanut conflict.\n2. **Khao Soi**: ✅ no known peanut conflict.\n3. **Tom Kha Gai**: ✅ no known peanut conflict.\n⛔ Avoid Pad Thai, Som Tam and Massaman Curry: the menu lists peanuts in all three."
+      "reference": "From the Golden Dragon Kitchen (金龍酒家) menu:\n1. **Mapo Tofu (麻婆豆腐)**: ✅ no known peanut conflict.\n2. **Xiaolongbao (小笼包)**: ✅ no known peanut conflict.\n3. **Hot & Sour Soup (酸辣汤)**: ⚠️ ask staff to confirm no peanut oil.\n⛔ Avoid Kung Pao Chicken, Dan Dan Noodles and Cold Peanut Noodles: the menu lists peanuts in all three.\nShow this to staff: 我对花生严重过敏 (I have a severe peanut allergy)."
     },
     {
       "id": "T08-no-location-known",
