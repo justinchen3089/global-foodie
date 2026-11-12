@@ -38,7 +38,7 @@
 
           <ol class="onboarding">
             <li class="ob-step" id="obLocation">
-              <div class="ob-title"><span class="ob-num">1</span>Where are you?</div>
+              <div class="ob-title"><span class="ob-num">1.</span> Where are you?<button type="button" class="ob-edit" id="obLocEdit">Change</button></div>
               <div class="ob-body">
                 <button type="button" id="obGeo" class="primary">📍 Use my location</button>
                 <span class="muted">or</span>
@@ -51,7 +51,7 @@
             </li>
 
             <li class="ob-step" id="obDiet">
-              <div class="ob-title"><span class="ob-num">2</span>Anything you can't eat? <span class="muted small">(optional)</span></div>
+              <div class="ob-title"><span class="ob-num">2.</span> Anything you can't eat? <span class="ob-optional">(optional)</span><button type="button" class="ob-edit" id="obDietEdit">Change</button></div>
               <div id="obDietGroups"></div>
               <form id="obOther" class="ob-other">
                 <label for="obOtherInput" class="small"><b>Not listed?</b> Type any allergy or food you avoid</label>
@@ -69,7 +69,7 @@
             </li>
 
             <li class="ob-step locked" id="obCraving">
-              <div class="ob-title"><span class="ob-num">3</span>What are you in the mood for?</div>
+              <div class="ob-title"><span class="ob-num">3.</span> What are you in the mood for?</div>
               <form id="cravingForm" class="craving">
                 <label for="cravingInput" class="craving-label">Craving for…</label>
                 <div class="chips" id="cravingChips"></div>

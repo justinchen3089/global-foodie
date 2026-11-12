@@ -380,16 +380,29 @@ function finishDiet(status) {
   $('#obCraving').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 $('#obDietDone').addEventListener('click', () => finishDiet());
+// Reopen step 2 so the traveler can add, type or remove allergies after answering it.
+function reopenDiet() {
+  dietDone = false;
+  syncOnboarding();
+  $('#obDiet').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  setTimeout(() => $('#obOtherInput').focus(), 150);
+}
+$('#obDietEdit').addEventListener('click', (e) => { e.stopPropagation(); reopenDiet(); });
+$('#obDiet').addEventListener('click', (e) => { if ($('#obDiet').classList.contains('done') && e.target.closest('.ob-title')) reopenDiet(); });
+function reopenLocation() { $('#obLocation').classList.remove('done'); $('#obPlace input').focus(); }
+$('#obLocEdit').addEventListener('click', (e) => { e.stopPropagation(); reopenLocation(); });
+$('#obLocation').addEventListener('click', (e) => { if ($('#obLocation').classList.contains('done') && e.target.closest('.ob-title')) reopenLocation(); });
 $('#obNone').addEventListener('click', () => finishDiet('none'));
 $('#obSkip').addEventListener('click', () => finishDiet('skipped'));
 
 function syncOnboarding() {
   const m = mem.loadMemory();
   const hasLoc = !!m.last_location && hasLocation();
+  // Allergies never depend on location: step 2 is always open. Step 3 opens once step 2 is answered.
   $('#obLocation').classList.toggle('done', hasLoc);
-  $('#obDiet').classList.toggle('locked', !hasLoc);
-  $('#obDiet').classList.toggle('done', hasLoc && dietDone);
-  $('#obCraving').classList.toggle('locked', !(hasLoc && dietDone));
+  $('#obDiet').classList.toggle('locked', false);
+  $('#obDiet').classList.toggle('done', dietDone);
+  $('#obCraving').classList.toggle('locked', !dietDone);
   const summary = m.restrictions_status === 'none' ? 'No restrictions'
     : m.allergies.length || m.diet.length ? [...m.allergies, ...m.diet].join(', ') : m.restrictions_status === 'skipped' ? 'Skipped' : '';
   $('#obDiet .ob-title').dataset.summary = summary;
