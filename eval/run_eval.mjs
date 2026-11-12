@@ -27,7 +27,7 @@ const FLAKY = +opt('flaky', 0);
 const STUB_WEB = !!opt('stub-web', false) || MOCK;
 const TRIALS = +opt('trials', 3);
 const K = +opt('k', TRIALS);
-const DELAY = +opt('delay', MOCK ? 0 : 4000); // ~15 model calls/min, under Gemini free-tier rate limits
+const DELAY = +opt('delay', MOCK ? 0 : 4000); // min gap between call starts: ~15 calls/min, under Gemini free-tier limits
 const OUT = resolve(ROOT, opt('out', 'eval/results'));
 const ONLY = opt('cases', '') ? String(opt('cases', '')).split(',').map((s) => s.trim()) : null;
 if (!MOCK && !process.env.GEMINI_API_KEY) {
@@ -52,16 +52,24 @@ let current = null; // { case, modelCalls }
 let AGENTS, TOOL_OWNER; // loaded below with the app modules
 
 const { default: worker } = await import(pathToFileURL(join(ROOT, 'proxy/worker.js')).href);
+// Use the same model settings as the deployed key server (proxy/wrangler.toml [vars]).
+const tomlVars = Object.fromEntries([...readFileSync(join(ROOT, 'proxy/wrangler.toml'), 'utf8').matchAll(/^\s*([A-Z_]+)\s*=\s*"([^"]*)"/gm)].map((m) => [m[1], m[2]]));
 const workerEnv = {
   GEMINI_API_KEY: process.env.GEMINI_API_KEY || 'mock-key',
   ALLOWED_ORIGINS: 'https://eval.local',
-  GEMINI_MODEL: opt('model', process.env.GEMINI_MODEL || ''),
+  GEMINI_MODEL: opt('model', process.env.GEMINI_MODEL || tomlVars.GEMINI_MODEL || ''),
+  FALLBACK_MODEL: process.env.FALLBACK_MODEL ?? tomlVars.FALLBACK_MODEL ?? '',
+  THINKING_LEVEL: process.env.THINKING_LEVEL || tomlVars.THINKING_LEVEL || '',
   MAX_OUTPUT_TOKENS: process.env.MAX_OUTPUT_TOKENS || '',
 };
 
+// Pace by start time: wait only if the previous call started less than DELAY ms ago.
+let lastCallStart = 0;
 async function geminiWithRetry(input, init) {
   for (let attempt = 0; ; attempt++) {
-    if (DELAY) await sleep(DELAY);
+    const gap = lastCallStart + DELAY - Date.now();
+    if (gap > 0) await sleep(gap);
+    lastCallStart = Date.now();
     const res = await realFetch(input, init);
     if (![429, 500, 503].includes(res.status) || attempt >= 6) return res;
     const wait = Math.min(60000, 4000 * 2 ** attempt);
@@ -268,7 +276,7 @@ const byCat = (cat) => rows.filter((r) => r.category === cat);
 const summary = { pass1: mean(rows.map((r) => r.pass1)), passk: mean(rows.map((r) => r.passk)) };
 
 let md = `# Global Foodie evaluation results\n\n`;
-md += `- Date: ${new Date().toISOString()}\n- Mode: ${MOCK ? `**MOCK self-test** (flaky=${FLAKY}); not a real model evaluation` : `Gemini via proxy policy (model: ${workerEnv.GEMINI_MODEL || 'gemini-flash-latest'})`}${STUB_WEB ? ', stubbed OpenStreetMap/Wikipedia' : ', live web tools'}\n`;
+md += `- Date: ${new Date().toISOString()}\n- Mode: ${MOCK ? `**MOCK self-test** (flaky=${FLAKY}); not a real model evaluation` : `Gemini via proxy policy (model: ${workerEnv.GEMINI_MODEL || 'gemini-flash-latest'}, fallback: ${workerEnv.FALLBACK_MODEL || 'none'}, thinking: ${workerEnv.THINKING_LEVEL || 'low'})`}${STUB_WEB ? ', stubbed OpenStreetMap/Wikipedia' : ', live web tools'}\n`;
 md += `- ${cases.length} cases × ${TRIALS} trials = ${runs.length} runs. pass@1 = c/n per case; pass^${K} = C(c,${K})/C(n,${K}) per case (chance that ${K} runs in a row all pass). Both are averaged over cases.\n\n`;
 md += `| | pass@1 | pass^${K} |\n|---|---|---|\n| **All cases** | **${pct(summary.pass1)}** | **${pct(summary.passk)}** |\n`;
 for (const cat of ['core', 'edge', 'adversarial']) if (byCat(cat).length) md += `| ${cat} (${byCat(cat).length}) | ${pct(mean(byCat(cat).map((r) => r.pass1)))} | ${pct(mean(byCat(cat).map((r) => r.passk)))} |\n`;

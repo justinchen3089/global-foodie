@@ -5,12 +5,12 @@ compatibility_date = "2026-10-01"
 [vars]
 # Replace YOUR-USERNAME with your GitHub username. Keep localhost for local testing.
 ALLOWED_ORIGINS = "https://YOUR-USERNAME.github.io,http://localhost:8000"
-# "gemini-flash-latest" always points at Google's current Flash model. Pin a specific model if you prefer.
-GEMINI_MODEL = "gemini-flash-latest"
+# Flash-Lite: fast, and much higher free-tier limits than Flash (fewer "high demand" 503s). Pin a specific model if you prefer.
+GEMINI_MODEL = "gemini-flash-lite-latest"
 # "low" keeps answers fast (Gemini 3.x defaults to "high" thinking, which can time out). minimal | low | medium | high | off
 THINKING_LEVEL = "low"
-# Used when the main model is overloaded (HTTP 503/429). Set to "" to disable.
-FALLBACK_MODEL = "gemini-flash-lite-latest"
+# Used when the main model is overloaded or rate-limited (HTTP 503/429). Set to "" to disable.
+FALLBACK_MODEL = "gemini-flash-latest"
 
 
 # The API key is NOT stored here. Set it as a secret:
