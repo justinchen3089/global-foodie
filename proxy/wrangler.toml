@@ -12,11 +12,6 @@ THINKING_LEVEL = "low"
 # Used when the main model is overloaded (HTTP 503/429). Set to "" to disable.
 FALLBACK_MODEL = "gemini-flash-lite-latest"
 
-# Per-visitor rate limit (60 model requests / minute per IP; one message uses ~5–15) so nobody can drain your quota.
-[[ratelimits]]
-name = "LIMITER"
-namespace_id = "1001"
-simple = { limit = 60, period = 60 }
 
 # The API key is NOT stored here. Set it as a secret:
 #   npx wrangler secret put GEMINI_API_KEY

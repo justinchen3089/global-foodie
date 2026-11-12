@@ -5,8 +5,9 @@
 // js/tools.js (all tools, allergy database), and proxy/worker.js (server policy + caps),
 // called in-process. Only the browser (localStorage, GPS) is simulated.
 //
-//   GEMINI_API_KEY=your-key node eval/run_eval.mjs                 # all cases, 3 trials, pass^3
-//   GEMINI_API_KEY=... node eval/run_eval.mjs --cases C01,C11 --trials 5 --k 3
+//   GEMINI_API_KEY=your-key node eval/run_eval.mjs                 # the 10 assignment cases, 3 trials, pass^3
+//   GEMINI_API_KEY=your-key node eval/run_eval.mjs --extra         # + 6 extra cases (16 total)
+//   GEMINI_API_KEY=... node eval/run_eval.mjs --cases T01,T09 --trials 5 --k 3
 //   GEMINI_API_KEY=... node eval/run_eval.mjs --stub-web             # fixed restaurant/wiki data (fully reproducible tools)
 //   node eval/run_eval.mjs --mock                                     # no key: replays the known-good reference answers
 //   node eval/run_eval.mjs --mock --flaky 0.3                         # harness self-test with random failures
@@ -26,7 +27,7 @@ const FLAKY = +opt('flaky', 0);
 const STUB_WEB = !!opt('stub-web', false) || MOCK;
 const TRIALS = +opt('trials', 3);
 const K = +opt('k', TRIALS);
-const DELAY = +opt('delay', MOCK ? 0 : 1200);
+const DELAY = +opt('delay', MOCK ? 0 : 4000); // ~15 model calls/min, under Gemini free-tier rate limits
 const OUT = resolve(ROOT, opt('out', 'eval/results'));
 const ONLY = opt('cases', '') ? String(opt('cases', '')).split(',').map((s) => s.trim()) : null;
 if (!MOCK && !process.env.GEMINI_API_KEY) {
@@ -135,6 +136,8 @@ const { runAgent } = await import(pathToFileURL(join(ROOT, 'js/agent.js')).href)
 ({ AGENTS, TOOL_OWNER } = await import(pathToFileURL(join(ROOT, 'js/agents.js')).href));
 const mem = await import(pathToFileURL(join(ROOT, 'js/memory.js')).href);
 const DATA = JSON.parse(readFileSync(join(ROOT, 'eval/cases.json'), 'utf8'));
+// --extra adds the 6 additional cases from cases-extra.json to the 10-case assignment set.
+if (opt('extra', false)) DATA.cases.push(...JSON.parse(readFileSync(join(ROOT, 'eval/cases-extra.json'), 'utf8')).cases);
 
 /** Load a test image the same way the site sends photos: base64 + MIME type. */
 function loadImage(rel) {
@@ -212,7 +215,7 @@ console.log(`Global Foodie eval · ${cases.length} cases × ${TRIALS} trials · 
 
 for (const c of cases) {
   process.stdout.write(`${c.id.padEnd(40)}`);
-  for (let trial = 1; trial <= TRIALS; trial++) {
+  for (let trial = 1, infraRetries = 0; trial <= TRIALS; trial++) {
     setupMemory(c.setup);
     current = { case: c, modelCalls: 0 };
     const run = { case: c.id, trial, tools: [], gates: [], texts: [], capped: 0, answer: '', error: null };
@@ -237,6 +240,17 @@ for (const c of cases) {
     run.memoryAfter = mem.loadMemory();
     run.failures = grade(c, run);
     run.pass = run.failures.length === 0;
+    // Google-side overload or rate limit (not the agent's fault): wait and re-run this trial once.
+    const transient = /\b(429|503)\b|high demand|RESOURCE_EXHAUSTED|quota|overloaded|took too long/i;
+    if (!run.pass && !MOCK && run.error && transient.test(run.error) && infraRetries < 1) {
+      infraRetries++;
+      process.stdout.write(' ↻');
+      await sleep(30000);
+      trial--;
+      continue;
+    }
+    run.infraRetried = infraRetries > 0;
+    infraRetries = 0;
     runs.push(run);
     process.stdout.write(run.pass ? ' ✅' : ' ❌');
   }
@@ -258,6 +272,8 @@ md += `- Date: ${new Date().toISOString()}\n- Mode: ${MOCK ? `**MOCK self-test**
 md += `- ${cases.length} cases × ${TRIALS} trials = ${runs.length} runs. pass@1 = c/n per case; pass^${K} = C(c,${K})/C(n,${K}) per case (chance that ${K} runs in a row all pass). Both are averaged over cases.\n\n`;
 md += `| | pass@1 | pass^${K} |\n|---|---|---|\n| **All cases** | **${pct(summary.pass1)}** | **${pct(summary.passk)}** |\n`;
 for (const cat of ['core', 'edge', 'adversarial']) if (byCat(cat).length) md += `| ${cat} (${byCat(cat).length}) | ${pct(mean(byCat(cat).map((r) => r.pass1)))} | ${pct(mean(byCat(cat).map((r) => r.passk)))} |\n`;
+const retried = runs.filter((r) => r.infraRetried).length;
+if (retried) md += `\n_${retried} run(s) were re-run once because Google returned a temporary overload or rate-limit error (not an agent failure)._\n`;
 md += `\n## Per case\n\n| Case | Type | Passed | pass@1 | pass^${K} |\n|---|---|---|---|---|\n`;
 for (const r of rows) md += `| ${r.id} | ${r.category} | ${r.c}/${r.n} | ${pct(r.pass1)} | ${pct(r.passk)} |\n`;
 const failed = runs.filter((r) => !r.pass);

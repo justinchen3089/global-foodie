@@ -8,10 +8,10 @@ Global Foodie helps travelers abroad decide **what to order**. It works from whe
 |---|---|
 | **Public link** | `https://YOUR-USERNAME.github.io/global-foodie/`: GitHub Pages plus a Cloudflare Worker, both always on, no login and no laptop needed (setup in sections 4–5) |
 | **Expansion beyond Milestone I** | **Multi-agent:** an orchestrator plus five specialist agents (Memory, Google Search, Image, Geolocation, Allergy). Each has its own prompt, tools and budget, with a written reason for each (section 3). Also **memory** (a persistent profile and order history) and real tools (Google Search grounding, OpenStreetMap, an embedded Google Map). *(Edit to match what your Milestone I had.)* |
-| **Evaluation (pass@1 / pass^k)** | [`eval/`](eval/README.md): 16 cases (4 adversarial, 4 edge, including a menu photo) × 3 trials. Run `GEMINI_API_KEY=… node eval/run_eval.mjs`, and the report goes to `eval/results/report.md` |
+| **Evaluation (pass@1 / pass^k)** | [`eval/`](eval/README.md): 10 cases (6 core, 2 edge including a menu photo, 2 adversarial) × 3 trials, plus 6 extra cases. Run `GEMINI_API_KEY=… node eval/run_eval.mjs`, and the report goes to `eval/results/report.md` |
 | **Governance note** | [`GOVERNANCE.md`](GOVERNANCE.md) |
 | **Human gate** | An Approve/Deny card in the chat, showing the action and every argument with its exact value, before `remember`, `forget`, `log_choice` and `get_current_location` |
-| **Cost caps** | Per message: 8 orchestrator calls, 18 model calls and 24 tool calls across all agents, plus a per-agent step limit. Per chat: 20 messages. Per answer: 2,048 output tokens. Per IP: 60 requests per minute. Per request: 8 MB. Enforced in the browser (`js/config.js`, `js/agents.js`) **and** on the server (`proxy/worker.js`) |
+| **Cost caps** | Per message: 8 orchestrator calls, 18 model calls and 24 tool calls across all agents, plus a per-agent step limit. Per chat: 20 messages. Per answer: 2,048 output tokens. Per request: 8 MB. Enforced in the browser (`js/config.js`, `js/agents.js`) **and** on the server (`proxy/worker.js`) |
 | **Keys** | Only as a Cloudflare secret (`wrangler secret put GEMINI_API_KEY`). Never in the repo or the UI |
 | **Nothing real connected** | No email, payments, bookings or deletions. Tools only read public data or write to the visitor's own browser |
 
