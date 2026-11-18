@@ -498,7 +498,7 @@ window.addEventListener('globalfoodie:memory', syncOnboarding);
 // Data a sample scenario filled in (its allergies too) is wiped, so it never leaks into a real session.
 {
   if (mem.loadMemory().from_scenario) mem.clearMemory();
-  else if (mem.loadMemory().last_location) mem.clearLocation();
+  else if (mem.loadMemory().last_location) { if (mem.clearLocation) mem.clearLocation(); }
   if (mem.loadMemory().restrictions_status) dietDone = true;
   syncOnboarding();
 }
@@ -516,7 +516,7 @@ async function runScenario(sc) {
   if (busy) return;
   resetChat();
   mem.setRestrictions({ allergies: sc.profile.allergies, diet: sc.profile.diet, none: sc.profile.none });
-  mem.markScenario();
+  if (mem.markScenario) mem.markScenario();
   if (sc.profile.spice) mem.remember('spice_tolerance', sc.profile.spice);
   const loc = CONFIG.PREVIEW ? setScenarioLocation(sc) : { lat: sc.lat, lon: sc.lon, place: sc.place, source: `scenario: ${sc.id}` };
   if (!CONFIG.PREVIEW) mem.setLastLocation(loc);

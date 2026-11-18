@@ -1,4 +1,6 @@
 // Persistent traveler memory (stored in this browser's localStorage).
+import { hasSensitive } from './privacy.js';
+
 const KEY = 'globalfoodie.memory.v1';
 
 export const CATEGORIES = ['allergy', 'diet', 'like', 'dislike', 'spice_tolerance', 'note'];
@@ -7,8 +9,14 @@ const LIST_FIELD = { allergy: 'allergies', diet: 'diet', like: 'likes', dislike:
 const empty = () => ({ allergies: [], diet: [], likes: [], dislikes: [], spice_tolerance: null, notes: [], history: [], last_location: null, restrictions_status: null });
 
 export function loadMemory() {
-  try { return { ...empty(), ...JSON.parse(localStorage.getItem(KEY) || '{}') }; }
+  let m;
+  try { m = { ...empty(), ...JSON.parse(localStorage.getItem(KEY) || '{}') }; }
   catch { return empty(); }
+  // Drop anything sensitive that may have been stored by an older version.
+  for (const f of ['allergies', 'diet', 'likes', 'dislikes', 'notes']) if (Array.isArray(m[f])) m[f] = m[f].filter((x) => !hasSensitive(x));
+  if (m.spice_tolerance && hasSensitive(m.spice_tolerance)) m.spice_tolerance = null;
+  if (Array.isArray(m.history)) m.history = m.history.filter((h) => !hasSensitive(JSON.stringify(h)));
+  return m;
 }
 
 function save(m) {
@@ -21,6 +29,7 @@ export function remember(category, value) {
   const m = loadMemory();
   const v = String(value ?? '').trim();
   if (!v) throw new Error('value is required');
+  if (hasSensitive(v) || v.includes('[removed]')) throw new Error('Not saved: that looks like private information (a key, password, card, ID number or contact detail). Global Foodie never stores it.');
   if (category === 'spice_tolerance') m.spice_tolerance = v;
   else {
     const f = LIST_FIELD[category];

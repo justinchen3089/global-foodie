@@ -2,6 +2,7 @@
 // SPECIALIST agents it delegates to (see js/agents.js). Every agent runs the same
 // Gemini tool-calling loop below, with its own prompt, tools and budget.
 import { TOOLS, TOOL_MAP } from './tools.js';
+import { redact } from './privacy.js';
 import { loadMemory } from './memory.js';
 import { CONFIG } from './config.js';
 import { AGENTS, AGENT_BY_TOOL, DELEGATION_TOOLS } from './agents.js';
@@ -237,7 +238,9 @@ export async function runAgent({ settings, history, userText, images = [], hooks
   const ctx = { settings, session, budget: { model: 0, tools: 0, maxModel: L.MAX_TOTAL_MODEL_CALLS, maxTools: L.MAX_TOTAL_TOOL_CALLS } };
   // The orchestrator doesn't receive the image bytes; the Image agent does.
   const note = images.length ? `\n\n[The traveler attached ${images.length} photo(s). Ask the image agent to read them.]` : '';
-  history.push(...adapter.userMessage((userText || 'What should I order from this photo?') + note, []));
+  // Private information never reaches the model (the website removes it first; this is a second check).
+  const safeText = redact(userText || '').text;
+  history.push(...adapter.userMessage((safeText || 'What should I order from this photo?') + note, []));
   let final = '';
   const answer = await runLoop({
     role: 'orchestrator', system: systemPrompt, tools: ORCHESTRATOR_TOOLS, history,
