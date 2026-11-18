@@ -327,3 +327,6 @@ dl.gate-args dd { margin: 0; font-weight: 600; word-break: break-word; }
 }
 
 .side[hidden] { display: none !important; }
+
+/* The allergy typing box stays visible even after step 2 is answered. */
+#obDiet.done > #obOther { display: block; margin-top: .6rem; }

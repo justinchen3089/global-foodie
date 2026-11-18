@@ -31,7 +31,8 @@ function resetChat() {
   $('#trace').innerHTML = '<p class="muted">Each step the agent takes — tool calls, inputs and results — appears here.</p>';
   syncOnboarding();
 }
-$('#newChat').addEventListener('click', resetChat);
+// New chat starts completely fresh: it erases the chat, location, allergies and everything remembered.
+$('#newChat').addEventListener('click', () => { mem.clearMemory(); location.reload(); });
 
 function scrollDown() { messagesEl.scrollTop = messagesEl.scrollHeight; }
 

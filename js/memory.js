@@ -74,3 +74,9 @@ export function setRestrictions({ allergies = [], diet = [], none = false } = {}
 }
 
 export function clearMemory() { return save(empty()); }
+
+/** Forget only the location (location is kept for the current visit, never across visits). */
+export function clearLocation() { const m = loadMemory(); m.last_location = null; return save(m); }
+
+/** Mark memory as filled in by a sample scenario, so it is wiped on the next visit. */
+export function markScenario() { const m = loadMemory(); m.from_scenario = true; return save(m); }

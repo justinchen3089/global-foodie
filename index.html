@@ -52,15 +52,16 @@
 
             <li class="ob-step" id="obDiet">
               <div class="ob-title"><span class="ob-num">2.</span> Anything you can't eat? <span class="ob-optional">(optional)</span><button type="button" class="ob-edit" id="obDietEdit">Change</button></div>
-              <div id="obDietGroups"></div>
               <form id="obOther" class="ob-other">
-                <label for="obOtherInput" class="small"><b>Not listed?</b> Type any allergy or food you avoid</label>
+                <label for="obOtherInput" class="small"><b>Type what you can't eat</b> (separate with commas), or pick from the list below</label>
                 <div class="ob-other-row">
                   <input id="obOtherInput" name="v" placeholder="e.g. kiwi, cilantro, mango, garlic, MSG" autocomplete="off">
                   <select name="cat" aria-label="Type"><option value="allergy">Allergy</option><option value="diet">Avoid / diet</option></select>
                   <button>Add</button>
                 </div>
               </form>
+              <div id="obDietGroups"></div>
+              
               <div class="ob-body">
                 <button type="button" id="obDietDone" class="primary">Continue</button>
                 <button type="button" id="obNone">No restrictions</button>
