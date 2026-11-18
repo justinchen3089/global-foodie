@@ -448,7 +448,9 @@ $('#obOther').addEventListener('submit', (e) => {
   e.preventDefault();
   const v = e.target.v.value.trim();
   if (!v) return;
-  v.split(/,|\band\b/).map((s) => s.trim()).filter(Boolean).forEach((x) => mem.remember(e.target.cat.value, x));
+  // Two buttons: "Add as allergy" or "Add as avoid". Pressing Enter counts as an allergy (the safer choice).
+  const cat = e.submitter?.value === 'diet' ? 'diet' : 'allergy';
+  v.split(/,|\band\b/).map((s) => s.trim()).filter(Boolean).forEach((x) => mem.remember(cat, x));
   e.target.v.value = '';
   e.target.v.focus();
 });

@@ -59,8 +59,8 @@
                 <label for="obOtherInput" class="small"><b>Type what you can't eat</b> (separate with commas), or pick from the list below</label>
                 <div class="ob-other-row">
                   <input id="obOtherInput" name="v" placeholder="e.g. kiwi, cilantro, mango, garlic, MSG" autocomplete="off">
-                  <select name="cat" aria-label="Type"><option value="allergy">Allergy</option><option value="diet">Avoid</option></select>
-                  <button>Add</button>
+                  <button type="submit" name="cat" value="allergy" class="primary">Add as allergy</button>
+                  <button type="submit" name="cat" value="diet">Add as avoid</button>
                 </div>
               </form>
               <div id="obDietGroups"></div>
