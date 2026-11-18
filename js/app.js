@@ -315,7 +315,7 @@ async function loadNearby() {
   } catch { /* map still shows the location */ }
 }
 
-async function setLocation(query) {
+async function setLocation(query, picked = null) {
   const status = $('#obLocStatus');
   status.textContent = query ? `Finding “${query}”…` : 'Asking your browser for your location…';
   status.className = 'ob-status small';
@@ -324,6 +324,9 @@ async function setLocation(query) {
     if (CONFIG.PREVIEW) {
       ({ loc, note } = previewLocate(query));
       await traceSetup(query ? 'geocode_location' : 'get_current_location', query ? { query } : {}, () => loc);
+    } else if (picked) {
+      // The traveler chose an exact place from the suggestion list: use its coordinates as-is.
+      loc = await traceSetup('geocode_location', { query, picked: true }, () => { mem.setLastLocation(picked); return picked; });
     } else if (query) {
       loc = await traceSetup('geocode_location', { query }, () => TOOL_MAP.geocode_location.run({ query }));
       if (!loc.found) throw new Error(loc.message);
@@ -343,7 +346,84 @@ async function setLocation(query) {
 }
 
 $('#obGeo').addEventListener('click', () => setLocation());
-$('#obPlace').addEventListener('submit', (e) => { e.preventDefault(); const q = e.target.q.value.trim(); if (q) setLocation(q); });
+$('#obPlace').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const q = e.target.q.value.trim();
+  const active = placeSuggest.items[placeSuggest.index];
+  if (active) return pickSuggestion(active);
+  hideSuggestions();
+  if (q) setLocation(q);
+});
+
+// ---------- Step 1: place suggestions while typing (like Google Maps) ----------
+// Uses Photon (OpenStreetMap search built for type-ahead). "Lawrenceville" shows
+// Lawrenceville, GA / Lawrenceville, NJ / ... so the traveler picks the right one.
+const US_STATES = { Alabama: 'AL', Alaska: 'AK', Arizona: 'AZ', Arkansas: 'AR', California: 'CA', Colorado: 'CO', Connecticut: 'CT', Delaware: 'DE', 'District of Columbia': 'DC', Florida: 'FL', Georgia: 'GA', Hawaii: 'HI', Idaho: 'ID', Illinois: 'IL', Indiana: 'IN', Iowa: 'IA', Kansas: 'KS', Kentucky: 'KY', Louisiana: 'LA', Maine: 'ME', Maryland: 'MD', Massachusetts: 'MA', Michigan: 'MI', Minnesota: 'MN', Mississippi: 'MS', Missouri: 'MO', Montana: 'MT', Nebraska: 'NE', Nevada: 'NV', 'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY', 'North Carolina': 'NC', 'North Dakota': 'ND', Ohio: 'OH', Oklahoma: 'OK', Oregon: 'OR', Pennsylvania: 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC', 'South Dakota': 'SD', Tennessee: 'TN', Texas: 'TX', Utah: 'UT', Vermont: 'VT', Virginia: 'VA', Washington: 'WA', 'West Virginia': 'WV', Wisconsin: 'WI', Wyoming: 'WY', 'Puerto Rico': 'PR' };
+const placeInput = $('#obPlace input');
+const placeList = $('#placeSuggest');
+const placeSuggest = { items: [], index: -1, timer: null, seq: 0 };
+
+function describePlace(p) {
+  const us = p.countrycode === 'US';
+  const region = us ? (US_STATES[p.state] || p.state) : p.state;
+  const name = p.name || p.street || p.city || '';
+  const town = p.city && p.city !== name ? p.city : '';
+  const main = [name, us ? (town || region) : town].filter(Boolean).join(', ');
+  const sub = us ? [town ? region : p.county, 'United States'].filter(Boolean).join(', ') : [region, p.country].filter(Boolean).join(', ');
+  return { main: main || sub, sub: main ? sub : '' };
+}
+function hideSuggestions() {
+  placeList.hidden = true; placeList.innerHTML = '';
+  placeSuggest.items = []; placeSuggest.index = -1;
+  placeInput.setAttribute('aria-expanded', 'false');
+}
+function renderSuggestions() {
+  if (!placeSuggest.items.length) { hideSuggestions(); return; }
+  placeList.innerHTML = placeSuggest.items.map((it, i) =>
+    `<li role="option" id="ps${i}" aria-selected="${i === placeSuggest.index}" data-i="${i}"><span class="ps-main">${escapeHtml(it.main)}</span>${it.sub ? `<span class="ps-sub">${escapeHtml(it.sub)}</span>` : ''}</li>`).join('');
+  placeList.hidden = false;
+  placeInput.setAttribute('aria-expanded', 'true');
+  placeList.querySelectorAll('li').forEach((li) => li.addEventListener('mousedown', (e) => { e.preventDefault(); pickSuggestion(placeSuggest.items[+li.dataset.i]); }));
+}
+async function fetchSuggestions(q) {
+  const seq = ++placeSuggest.seq;
+  try {
+    const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=7&lang=en`);
+    const j = await res.json();
+    if (seq !== placeSuggest.seq) return; // a newer keystroke already started a search
+    const seen = new Set();
+    placeSuggest.items = (j.features || []).map((f) => {
+      const p = f.properties || {}; const d = describePlace(p);
+      return { ...d, lat: +f.geometry.coordinates[1].toFixed(5), lon: +f.geometry.coordinates[0].toFixed(5), p };
+    }).filter((it) => { const k = `${it.main}|${it.sub}`; if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 6);
+    placeSuggest.index = -1;
+    renderSuggestions();
+  } catch { hideSuggestions(); } // suggestions are optional: Go still works
+}
+function pickSuggestion(it) {
+  hideSuggestions();
+  const label = it.p.countrycode === 'US' ? `${it.main}, USA` : [it.main, it.sub].filter(Boolean).join(', ');
+  placeInput.value = it.main;
+  setLocation(label, {
+    lat: it.lat, lon: it.lon, place: label,
+    neighborhood: it.p.district || it.p.locality || undefined, city: it.p.city || it.p.name, country: it.p.country, country_code: it.p.countrycode,
+    source: `picked: ${label}`,
+  });
+}
+placeInput.addEventListener('input', () => {
+  clearTimeout(placeSuggest.timer);
+  const q = placeInput.value.trim();
+  if (q.length < 2 || CONFIG.PREVIEW) { placeSuggest.seq++; hideSuggestions(); return; }
+  placeSuggest.timer = setTimeout(() => fetchSuggestions(q), 250);
+});
+placeInput.addEventListener('keydown', (e) => {
+  if (placeList.hidden) return;
+  const n = placeSuggest.items.length;
+  if (e.key === 'ArrowDown') { e.preventDefault(); placeSuggest.index = (placeSuggest.index + 1) % n; renderSuggestions(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); placeSuggest.index = (placeSuggest.index - 1 + n) % n; renderSuggestions(); }
+  else if (e.key === 'Escape') { hideSuggestions(); }
+});
+placeInput.addEventListener('blur', () => setTimeout(hideSuggestions, 150));
 $('#mapChange').addEventListener('click', () => {
   setView('chat');
   $('#welcome').hidden = false;
@@ -412,11 +492,12 @@ function syncOnboarding() {
 }
 window.addEventListener('globalfoodie:memory', syncOnboarding);
 
-// Restore a saved location on load (map first).
+// Every visit starts without a location: the traveler sets it again (it may have changed).
+// Data a sample scenario filled in (its allergies too) is wiped, so it never leaks into a real session.
 {
+  if (mem.loadMemory().from_scenario) mem.clearMemory();
+  else if (mem.loadMemory().last_location) mem.clearLocation();
   if (mem.loadMemory().restrictions_status) dietDone = true;
-  const last = mem.loadMemory().last_location;
-  if (last?.lat != null) { showLocation({ lat: last.lat, lon: last.lon, place: last.place, sample: CONFIG.PREVIEW || /SAMPLE/.test(last.source || '') }); loadNearby(); }
   syncOnboarding();
 }
 
@@ -433,6 +514,7 @@ async function runScenario(sc) {
   if (busy) return;
   resetChat();
   mem.setRestrictions({ allergies: sc.profile.allergies, diet: sc.profile.diet, none: sc.profile.none });
+  mem.markScenario();
   if (sc.profile.spice) mem.remember('spice_tolerance', sc.profile.spice);
   const loc = CONFIG.PREVIEW ? setScenarioLocation(sc) : { lat: sc.lat, lon: sc.lon, place: sc.place, source: `scenario: ${sc.id}` };
   if (!CONFIG.PREVIEW) mem.setLastLocation(loc);

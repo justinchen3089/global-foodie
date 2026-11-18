@@ -330,3 +330,13 @@ dl.gate-args dd { margin: 0; font-weight: 600; word-break: break-word; }
 
 /* The allergy typing box stays visible even after step 2 is answered. */
 #obDiet.done > #obOther { display: block; margin-top: .6rem; }
+
+/* Location suggestions under the step 1 box (like Google Maps). */
+.place-wrap { position: relative; flex: 1; min-width: 0; display: flex; }
+.place-wrap input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 10px; padding: .5rem .7rem; background: var(--bg); }
+.place-suggest { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 50; margin: 0; padding: .25rem 0; list-style: none; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.12); max-height: 320px; overflow-y: auto; }
+.place-suggest li { padding: .5rem .8rem; cursor: pointer; line-height: 1.25; }
+.place-suggest li .ps-main { font-weight: 600; }
+.place-suggest li .ps-sub { display: block; font-size: .82rem; color: var(--muted); }
+.place-suggest li[aria-selected="true"], .place-suggest li:hover { background: var(--bg); }
+.place-suggest li.ps-empty { cursor: default; color: var(--muted); font-size: .9rem; }

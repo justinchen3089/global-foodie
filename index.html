@@ -43,7 +43,10 @@
                 <button type="button" id="obGeo" class="primary">📍 Use my location</button>
                 <span class="muted">or</span>
                 <form id="obPlace" class="ob-place">
-                  <input name="q" placeholder="City, neighborhood or hotel" aria-label="Type your location">
+                  <div class="place-wrap">
+                    <input name="q" placeholder="City, neighborhood or hotel" aria-label="Type your location" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="placeSuggest">
+                    <ul id="placeSuggest" class="place-suggest" role="listbox" hidden></ul>
+                  </div>
                   <button>Go</button>
                 </form>
               </div>
