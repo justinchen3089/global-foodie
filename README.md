@@ -6,7 +6,7 @@ Global Foodie helps travelers abroad decide **what to order**. It works from whe
 
 | Requirement | Where |
 |---|---|
-| **Public link** | `[https://YOUR-USERNAME.github.io/global-foodie/](https://justinchen3089.github.io/global-foodie/)`: GitHub Pages plus a Cloudflare Worker, both always on, no login and no laptop needed (setup in sections 4–5) |
+| **Public link** | `https://justinchen3089.github.io/global-foodie/`: GitHub Pages plus a Cloudflare Worker, both always on, no login and no laptop needed (setup in sections 4–5) |
 | **Expansion beyond Milestone I** | **Multi-agent:** an orchestrator plus five specialist agents (Memory, Google Search, Image, Geolocation, Allergy). Each has its own prompt, tools and budget, with a written reason for each (section 3). Also **memory** (a persistent profile and order history) and real tools (Google Search grounding, OpenStreetMap, an embedded Google Map). *(Edit to match what your Milestone I had.)* |
 | **Evaluation (pass@1 / pass^k)** | [`eval/`](eval/README.md): 10 cases (6 core, 2 edge including a menu photo, 2 adversarial) × 3 trials, plus 6 extra cases. Run `GEMINI_API_KEY=… node eval/run_eval.mjs`, and the report goes to `eval/results/report.md` |
 | **Governance note** | [`GOVERNANCE.md`](GOVERNANCE.md) |
